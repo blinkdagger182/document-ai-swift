@@ -15,17 +15,14 @@ struct HomeView: View {
             AnimatedGradientBackground()
             
             if viewModel.showResults {
-                FillDocumentView(
+                SplitScreenEditorView(
                     components: viewModel.components,
-                    fieldMap: viewModel.fieldMap,
-                    formData: viewModel.formData,
+                    fieldRegions: viewModel.fieldRegions,
                     documentId: viewModel.documentId,
                     selectedFile: viewModel.selectedFile,
+                    pdfURL: viewModel.pdfURL,
                     onBack: {
                         viewModel.showResults = false
-                    },
-                    onUploadAnother: {
-                        viewModel.reset()
                     }
                 )
             } else {

@@ -118,6 +118,54 @@ struct FieldMetadata: Codable {
     // Stub - will be populated by backend
 }
 
+// MARK: - Field Region (for PDF coordinate mapping)
+struct FieldRegion: Identifiable, Codable {
+    let id: String
+    let fieldId: String
+    let x: Double
+    let y: Double
+    let width: Double
+    let height: Double
+    let page: Int?
+    let source: FieldSource
+    
+    enum FieldSource: String, Codable {
+        case acroform = "acroform"  // Native PDF form field
+        case ocr = "ocr"            // OCR-detected field
+    }
+    
+    init(id: String = UUID().uuidString, fieldId: String, x: Double, y: Double, width: Double, height: Double, page: Int?, source: FieldSource = .acroform) {
+        self.id = id
+        self.fieldId = fieldId
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.page = page
+        self.source = source
+    }
+    
+    // Convert from FieldMetadata
+    static func from(fieldId: String, metadata: FieldMetadata, source: FieldSource = .acroform) -> FieldRegion? {
+        guard let x = metadata.x,
+              let y = metadata.y,
+              let width = metadata.width,
+              let height = metadata.height else {
+            return nil
+        }
+        
+        return FieldRegion(
+            fieldId: fieldId,
+            x: x,
+            y: y,
+            width: width,
+            height: height,
+            page: metadata.page,
+            source: source
+        )
+    }
+}
+
 // MARK: - Form Data
 typealias FormData = [String: String]
 
@@ -126,6 +174,20 @@ struct ProcessResult: Codable {
     let documentId: String
     let components: [FieldComponent]
     let fieldMap: FieldMap
+    let fieldRegions: [FieldRegion]?
+    let pdfURL: URL?
+    
+    // Computed property to get field regions from fieldMap if not provided
+    var regions: [FieldRegion] {
+        if let fieldRegions = fieldRegions {
+            return fieldRegions
+        }
+        
+        // Convert fieldMap to fieldRegions
+        return fieldMap.compactMap { (fieldId, metadata) in
+            FieldRegion.from(fieldId: fieldId, metadata: metadata)
+        }
+    }
 }
 
 struct OverlayResult: Codable {

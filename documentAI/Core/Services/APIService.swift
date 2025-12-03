@@ -96,10 +96,52 @@ class APIService: ObservableObject {
             )
         ]
         
+        // Stub field regions (example coordinates)
+        let stubFieldRegions = [
+            FieldRegion(
+                fieldId: "field_1",
+                x: 100,
+                y: 200,
+                width: 200,
+                height: 30,
+                page: 0,
+                source: .acroform
+            ),
+            FieldRegion(
+                fieldId: "field_2",
+                x: 100,
+                y: 250,
+                width: 200,
+                height: 30,
+                page: 0,
+                source: .acroform
+            ),
+            FieldRegion(
+                fieldId: "field_3",
+                x: 100,
+                y: 300,
+                width: 200,
+                height: 30,
+                page: 0,
+                source: .ocr
+            ),
+            FieldRegion(
+                fieldId: "field_4",
+                x: 100,
+                y: 350,
+                width: 20,
+                height: 20,
+                page: 0,
+                source: .acroform
+            )
+        ]
+        
         return ProcessResult(
             documentId: "doc_\(Int(Date().timeIntervalSince1970))",
             components: stubComponents,
-            fieldMap: [:]
+            fieldMap: [:],
+            fieldRegions: stubFieldRegions,
+            pdfURL: file.url
         )
     }
     

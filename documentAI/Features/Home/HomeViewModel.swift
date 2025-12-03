@@ -18,8 +18,10 @@ class HomeViewModel: ObservableObject {
     @Published var showResults = false
     @Published var components: [FieldComponent] = []
     @Published var fieldMap: FieldMap = [:]
+    @Published var fieldRegions: [FieldRegion] = []
     @Published var formData: FormData = [:]
     @Published var documentId = ""
+    @Published var pdfURL: URL?
     
     @Published var alertState: AlertState?
     
@@ -72,10 +74,12 @@ class HomeViewModel: ObservableObject {
             uploading = false
             processing = true
             
-            // Store document ID and field map
+            // Store document ID, field map, and regions
             documentId = result.documentId
             components = result.components
             fieldMap = result.fieldMap
+            fieldRegions = result.regions
+            pdfURL = result.pdfURL ?? file.url
             
             // Initialize form data with default values
             var initialFormData: FormData = [:]
@@ -117,8 +121,10 @@ class HomeViewModel: ObservableObject {
         showResults = false
         components = []
         fieldMap = [:]
+        fieldRegions = []
         formData = [:]
         documentId = ""
+        pdfURL = nil
         progress = 0.0
     }
 }
