@@ -19,6 +19,7 @@ struct FillDocumentView: View {
         formData: FormData,
         documentId: String,
         selectedFile: DocumentModel?,
+        fieldRegions: [FieldRegion] = [],
         onBack: @escaping () -> Void,
         onUploadAnother: @escaping () -> Void
     ) {
@@ -27,7 +28,8 @@ struct FillDocumentView: View {
             fieldMap: fieldMap,
             formData: formData,
             documentId: documentId,
-            selectedFile: selectedFile
+            selectedFile: selectedFile,
+            fieldRegions: fieldRegions
         ))
         self.onBack = onBack
         self.onUploadAnother = onUploadAnother

@@ -3,6 +3,7 @@
 //  documentAI
 //
 //  Service for API calls (upload, process, overlay)
+//  Updated with real Cloud Run endpoints
 //
 
 import Foundation
@@ -10,8 +11,8 @@ import Foundation
 @MainActor
 class APIService: ObservableObject {
     
-    // TODO: Configure your API endpoint
-    private let baseURL = "https://your-api-endpoint.com"
+    // Production Cloud Run endpoint
+    private let baseURL = "https://documentai-ocr-worker-824241800977.us-central1.run.app"
     
     // MARK: - Upload and Process Document
     func uploadAndProcessDocument(
@@ -19,21 +20,10 @@ class APIService: ObservableObject {
         progressHandler: @escaping (Double) -> Void
     ) async throws -> ProcessResult {
         
-        // TODO: Implement actual upload logic
-        // This is a stub that simulates upload progress
-        
-        // Simulate upload progress
-        for i in 0...100 {
-            try await Task.sleep(nanoseconds: 30_000_000) // 30ms
-            progressHandler(Double(i))
-        }
-        
-        // TODO: Replace with actual API call
-        // Example implementation:
-        /*
-        let url = URL(string: "\(baseURL)/upload")!
+        let url = URL(string: "\(baseURL)/ui/generate")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = 120
         
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -44,155 +34,274 @@ class APIService: ObservableObject {
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(file.name)\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: \(file.mimeType)\r\n\r\n".data(using: .utf8)!)
-        body.append(try Data(contentsOf: file.url))
+        
+        let fileData = try Data(contentsOf: file.url)
+        body.append(fileData)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
         
         request.httpBody = body
         
+        // Simulate progress during upload
+        Task {
+            for i in 0...90 {
+                try? await Task.sleep(nanoseconds: 20_000_000) // 20ms
+                progressHandler(Double(i))
+            }
+        }
+        
+        // Make request
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        progressHandler(100)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            print("❌ API Error (\(httpResponse.statusCode)): \(errorMessage)")
             throw APIError.uploadFailed
         }
         
-        let result = try JSONDecoder().decode(ProcessResult.self, from: data)
-        return result
-        */
-        
-        // Stub response
-        let stubComponents = [
-            FieldComponent(
-                id: "field_1",
-                type: .text,
-                label: "Full Name",
-                placeholder: "Enter your full name",
-                options: nil,
-                value: AnyCodable("")
-            ),
-            FieldComponent(
-                id: "field_2",
-                type: .email,
-                label: "Email Address",
-                placeholder: "your@email.com",
-                options: nil,
-                value: AnyCodable("")
-            ),
-            FieldComponent(
-                id: "field_3",
-                type: .select,
-                label: "Document Type",
-                placeholder: "Select type",
-                options: ["Passport", "Driver License", "ID Card"],
-                value: AnyCodable("")
-            ),
-            FieldComponent(
-                id: "field_4",
-                type: .checkbox,
-                label: "I agree to terms and conditions",
-                placeholder: nil,
-                options: nil,
-                value: AnyCodable(false)
-            )
-        ]
-        
-        // Stub field regions (example coordinates)
-        let stubFieldRegions = [
-            FieldRegion(
-                fieldId: "field_1",
-                x: 100,
-                y: 200,
-                width: 200,
-                height: 30,
-                page: 0,
-                source: .acroform
-            ),
-            FieldRegion(
-                fieldId: "field_2",
-                x: 100,
-                y: 250,
-                width: 200,
-                height: 30,
-                page: 0,
-                source: .acroform
-            ),
-            FieldRegion(
-                fieldId: "field_3",
-                x: 100,
-                y: 300,
-                width: 200,
-                height: 30,
-                page: 0,
-                source: .ocr
-            ),
-            FieldRegion(
-                fieldId: "field_4",
-                x: 100,
-                y: 350,
-                width: 20,
-                height: 20,
-                page: 0,
-                source: .acroform
-            )
-        ]
-        
-        return ProcessResult(
-            documentId: "doc_\(Int(Date().timeIntervalSince1970))",
-            components: stubComponents,
-            fieldMap: [:],
-            fieldRegions: stubFieldRegions,
-            pdfURL: file.url
-        )
+        // Parse response
+        do {
+            // Debug: Print raw response
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("📥 API Response: \(jsonString.prefix(500))")
+            }
+            
+            let ocrResponse = try JSONDecoder().decode(OCRResponse.self, from: data)
+            print("✅ Decoded successfully: \(ocrResponse.components.count) components")
+            
+            // Convert to ProcessResult
+            return convertOCRResponseToProcessResult(ocrResponse, pdfURL: file.url)
+        } catch {
+            print("❌ Decoding error: \(error)")
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    print("   Missing key: \(key.stringValue) at \(context.codingPath)")
+                case .typeMismatch(let type, let context):
+                    print("   Type mismatch: expected \(type) at \(context.codingPath)")
+                case .valueNotFound(let type, let context):
+                    print("   Value not found: \(type) at \(context.codingPath)")
+                case .dataCorrupted(let context):
+                    print("   Data corrupted at \(context.codingPath)")
+                @unknown default:
+                    print("   Unknown decoding error")
+                }
+            }
+            throw error
+        }
     }
     
     // MARK: - Overlay PDF
     func overlayPDF(
         document: DocumentModel,
         documentId: String,
-        formData: FormData
+        formData: FormData,
+        fieldRegions: [FieldRegion]
     ) async throws -> OverlayResult {
         
-        // TODO: Implement actual overlay API call
-        // This is a stub that simulates PDF generation
-        
-        try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-        
-        // TODO: Replace with actual API call
-        /*
         let url = URL(string: "\(baseURL)/overlay")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 120
         
-        let payload: [String: Any] = [
-            "documentId": documentId,
-            "formData": formData
-        ]
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         
-        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        var body = Data()
         
+        // Add file data
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(document.name)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(document.mimeType)\r\n\r\n".data(using: .utf8)!)
+        
+        let fileData = try Data(contentsOf: document.url)
+        body.append(fileData)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add filled_data JSON
+        let filledData = createFilledDataPayload(
+            documentId: documentId,
+            formData: formData,
+            fieldRegions: fieldRegions
+        )
+        
+        let jsonData = try JSONSerialization.data(withJSONObject: filledData)
+        
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"filled_data\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: application/json\r\n\r\n".data(using: .utf8)!)
+        body.append(jsonData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        request.httpBody = body
+        
+        // Make request
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            print("❌ Overlay Error (\(httpResponse.statusCode)): \(errorMessage)")
             throw APIError.overlayFailed
         }
         
-        // Download the generated PDF
-        let pdfURL = try JSONDecoder().decode(OverlayResult.self, from: data).localPdfURL
-        return OverlayResult(localPdfURL: pdfURL)
-        */
-        
-        // Stub: Create a dummy PDF file
+        // Save PDF to temp file
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("filled_\(documentId).pdf")
         
-        // Create empty PDF data
-        let pdfData = Data()
-        try pdfData.write(to: tempURL)
+        try data.write(to: tempURL)
         
         return OverlayResult(localPdfURL: tempURL)
     }
+    
+    // MARK: - Helper Functions
+    
+    private func convertOCRResponseToProcessResult(_ response: OCRResponse, pdfURL: URL) -> ProcessResult {
+        // Convert OCR components to FieldComponents
+        var fieldComponents: [FieldComponent] = []
+        var fieldRegions: [FieldRegion] = []
+        
+        for component in response.components {
+            // Map component type
+            let fieldType: FieldType
+            switch component.type {
+            case "checkbox":
+                fieldType = .checkbox
+            case "input", "text_field":
+                fieldType = .text
+            default:
+                fieldType = .text
+            }
+            
+            // Create FieldComponent
+            let fieldComponent = FieldComponent(
+                id: component.id,
+                type: fieldType,
+                label: component.label,
+                placeholder: nil,
+                options: nil,
+                value: AnyCodable(component.value ?? "")
+            )
+            fieldComponents.append(fieldComponent)
+            
+            // Create FieldRegion from bbox
+            if let bbox = component.bbox, bbox.count == 8 {
+                let x = min(bbox[0], bbox[6])
+                let y = min(bbox[1], bbox[3])
+                let width = max(bbox[2], bbox[4]) - x
+                let height = max(bbox[5], bbox[7]) - y
+                
+                let fieldRegion = FieldRegion(
+                    fieldId: component.id,
+                    x: x,
+                    y: y,
+                    width: width,
+                    height: height,
+                    page: component.page > 0 ? component.page - 1 : 0, // Convert to 0-indexed
+                    source: .ocr
+                )
+                fieldRegions.append(fieldRegion)
+            }
+        }
+        
+        return ProcessResult(
+            documentId: UUID().uuidString,
+            components: fieldComponents,
+            fieldMap: [:],
+            fieldRegions: fieldRegions,
+            pdfURL: pdfURL
+        )
+    }
+    
+    private func createFilledDataPayload(
+        documentId: String,
+        formData: FormData,
+        fieldRegions: [FieldRegion]
+    ) -> [String: Any] {
+        var fieldMap: [String: [String: Any]] = [:]
+        
+        for region in fieldRegions {
+            fieldMap[region.fieldId] = [
+                "bbox": [
+                    region.x, region.y,
+                    region.x + region.width, region.y,
+                    region.x + region.width, region.y + region.height,
+                    region.x, region.y + region.height
+                ],
+                "page": (region.page ?? 0) + 1, // Convert back to 1-indexed
+                "type": "text_field"
+            ]
+        }
+        
+        return [
+            "documentId": documentId,
+            "values": formData,
+            "fieldMap": fieldMap
+        ]
+    }
+}
+
+// MARK: - API Response Models
+
+struct OCRResponse: Codable {
+    let success: Bool
+    let components: [OCRComponent]
+    let fieldMap: [String: OCRFieldInfo]?
+    let metadata: OCRMetadata?
+}
+
+struct OCRComponent: Codable {
+    let id: String
+    let type: String
+    let label: String
+    let valueRaw: AnyCodable?
+    let bbox: [Double]?
+    let page: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case id, type, label, bbox, page
+        case valueRaw = "value"
+    }
+    
+    // Computed property to get value as string
+    var value: String? {
+        if let val = valueRaw?.value {
+            if let boolVal = val as? Bool {
+                return boolVal ? "true" : "false"
+            } else if let stringVal = val as? String {
+                return stringVal
+            } else {
+                return String(describing: val)
+            }
+        }
+        return nil
+    }
+}
+
+struct OCRFieldInfo: Codable {
+    let bbox: [Double]
+    let page: Int
+    let type: String
+}
+
+struct OCRMetadata: Codable {
+    let pages: [PageInfo]?
+    let total_pages: Int?
+    let total_fields: Int?
+}
+
+struct PageInfo: Codable {
+    let page: Int
+    let width: Double
+    let height: Double
 }
 
 // MARK: - API Errors
@@ -209,6 +318,15 @@ enum APIError: LocalizedError {
             return "Failed to generate filled PDF"
         case .invalidResponse:
             return "Invalid server response"
+        }
+    }
+}
+
+// MARK: - Data Extension
+extension Data {
+    mutating func append(_ string: String) {
+        if let data = string.data(using: .utf8) {
+            append(data)
         }
     }
 }

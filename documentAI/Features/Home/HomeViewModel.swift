@@ -108,9 +108,22 @@ class HomeViewModel: ObservableObject {
         } catch {
             uploading = false
             processing = false
+            
+            print("❌ Upload error: \(error)")
+            print("   Error type: \(type(of: error))")
+            
+            let errorMessage: String
+            if let decodingError = error as? DecodingError {
+                errorMessage = "Failed to parse server response. Please check logs."
+            } else if let apiError = error as? APIError {
+                errorMessage = apiError.localizedDescription
+            } else {
+                errorMessage = error.localizedDescription
+            }
+            
             alertState = AlertState(
                 title: "Error",
-                message: error.localizedDescription
+                message: errorMessage
             )
         }
     }

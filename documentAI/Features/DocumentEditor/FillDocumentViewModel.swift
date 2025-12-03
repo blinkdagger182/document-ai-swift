@@ -27,6 +27,7 @@ class FillDocumentViewModel: ObservableObject {
     private var selectedFile: DocumentModel?
     private var fileName: String?
     private var autoSaveTimer: Timer?
+    private var fieldRegions: [FieldRegion]
     
     // MARK: - Init
     init(
@@ -34,7 +35,8 @@ class FillDocumentViewModel: ObservableObject {
         fieldMap: FieldMap,
         formData: FormData,
         documentId: String,
-        selectedFile: DocumentModel?
+        selectedFile: DocumentModel?,
+        fieldRegions: [FieldRegion] = []
     ) {
         self.components = components
         self.fieldMap = fieldMap
@@ -42,6 +44,7 @@ class FillDocumentViewModel: ObservableObject {
         self.documentId = documentId
         self.selectedFile = selectedFile
         self.fileName = selectedFile?.name
+        self.fieldRegions = fieldRegions
     }
     
     // MARK: - Update Field Value
@@ -111,7 +114,8 @@ class FillDocumentViewModel: ObservableObject {
             let result = try await apiService.overlayPDF(
                 document: file,
                 documentId: documentId,
-                formData: formData
+                formData: formData,
+                fieldRegions: fieldRegions
             )
             
             savedPdfUrl = result.localPdfURL

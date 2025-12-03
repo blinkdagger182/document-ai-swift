@@ -186,7 +186,8 @@ class DocumentViewModel: ObservableObject {
             _ = try await apiService.overlayPDF(
                 document: file,
                 documentId: documentId,
-                formData: formData
+                formData: formData,
+                fieldRegions: fieldRegions
             )
             
             submitting = false
