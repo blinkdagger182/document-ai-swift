@@ -51,6 +51,12 @@ class DocumentViewModel: ObservableObject {
         self.fileName = selectedFile?.name
         self.pdfURL = pdfURL
         
+        // Debug: Log field regions to check coordinates
+        print("📍 Field Regions Count: \(fieldRegions.count)")
+        for (index, region) in fieldRegions.prefix(5).enumerated() {
+            print("📍 Region \(index): fieldId=\(region.fieldId), x=\(region.x), y=\(region.y), w=\(region.width), h=\(region.height), page=\(region.page ?? -1)")
+        }
+        
         // Build UUID mappings
         buildFieldMappings()
         
