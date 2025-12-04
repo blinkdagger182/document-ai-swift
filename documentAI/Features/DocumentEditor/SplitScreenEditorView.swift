@@ -105,21 +105,21 @@ struct SplitScreenEditorView: View {
     
     // MARK: - PDF Viewer Pane
     private func pdfViewerPane(height: CGFloat) -> some View {
-        ZStack {
-            if let url = viewModel.pdfURL {
-                PDFKitRepresentedView(
-                    pdfURL: url,
-                    formValues: $viewModel.formValues,
-                    fieldRegions: viewModel.fieldRegions,
-                    fieldIdToUUID: viewModel.fieldIdToUUID,
-                    onFieldTapped: { uuid in
-                        handleFieldTapped(uuid: uuid)
-                    }
-                )
+        GeometryReader { geometry in
+            ZStack {
+                if let url = viewModel.pdfURL {
+                    PDFKitRepresentedView(
+                        pdfURL: url,
+                        formValues: $viewModel.formValues,
+                        fieldRegions: viewModel.fieldRegions,
+                        fieldIdToUUID: viewModel.fieldIdToUUID,
+                        onFieldTapped: { uuid in
+                            handleFieldTapped(uuid: uuid)
+                        },
+                        pdfViewSize: geometry.size
+                    )
+                }
             }
-            
-            // Overlay tappable boxes for field regions
-            fieldOverlayBoxes
         }
         .frame(height: height)
         .background(Color.gray.opacity(0.1))
@@ -140,13 +140,7 @@ struct SplitScreenEditorView: View {
         .background(Color.gray.opacity(0.1))
     }
     
-    // MARK: - Field Overlay Boxes
-    private var fieldOverlayBoxes: some View {
-        // Note: Overlay boxes would require coordinate transformation
-        // from PDF coordinates to screen coordinates
-        // This is a simplified version
-        Color.clear
-    }
+
     
     // MARK: - Drag Handle
     private var dragHandle: some View {

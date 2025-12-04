@@ -14,12 +14,16 @@ struct PDFKitRepresentedView: UIViewRepresentable {
     let fieldRegions: [FieldRegion]
     let fieldIdToUUID: [String: UUID]
     let onFieldTapped: (UUID) -> Void
+    let pdfViewSize: CGSize
     
-    func makeUIView(context: Context) -> PDFView {
+    func makeUIView(context: Context) -> UIView {
+        let containerView = UIView()
+        
         let pdfView = PDFView()
         pdfView.autoScales = true
         pdfView.displayMode = .singlePageContinuous
         pdfView.displayDirection = .vertical
+        pdfView.backgroundColor = .clear
         
         // Load PDF document
         if let document = PDFDocument(url: pdfURL) {
@@ -33,13 +37,36 @@ struct PDFKitRepresentedView: UIViewRepresentable {
             pdfView.addGestureRecognizer(tapGesture)
             
             context.coordinator.pdfView = pdfView
+            context.coordinator.containerView = containerView
+            
+            // Create overlay layer for field boxes
+            let overlayLayer = CALayer()
+            overlayLayer.name = "fieldOverlay"
+            context.coordinator.overlayLayer = overlayLayer
+            
+            containerView.addSubview(pdfView)
+            containerView.layer.addSublayer(overlayLayer)
+            
+            pdfView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                pdfView.topAnchor.constraint(equalTo: containerView.topAnchor),
+                pdfView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                pdfView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+                pdfView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+            ])
+            
+            // Draw field overlays after a short delay to ensure PDF is loaded
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                context.coordinator.drawFieldOverlays()
+            }
         }
         
-        return pdfView
+        return containerView
     }
     
-    func updateUIView(_ pdfView: PDFView, context: Context) {
-        guard let document = pdfView.document else { return }
+    func updateUIView(_ containerView: UIView, context: Context) {
+        guard let pdfView = context.coordinator.pdfView,
+              let document = pdfView.document else { return }
         
         // Update PDF annotations with current formValues
         for (uuid, value) in formValues {
@@ -55,7 +82,8 @@ struct PDFKitRepresentedView: UIViewRepresentable {
             let annotation = findOrCreateAnnotation(
                 for: region,
                 on: page,
-                fieldId: fieldId
+                fieldId: fieldId,
+                pdfView: pdfView
             )
             
             // Update annotation value if changed
@@ -66,6 +94,9 @@ struct PDFKitRepresentedView: UIViewRepresentable {
                 pdfView.setNeedsDisplay(annotation.bounds)
             }
         }
+        
+        // Redraw field overlays when form values change
+        context.coordinator.drawFieldOverlays()
     }
     
     func makeCoordinator() -> Coordinator {
@@ -81,14 +112,17 @@ struct PDFKitRepresentedView: UIViewRepresentable {
     private func findOrCreateAnnotation(
         for region: FieldRegion,
         on page: PDFPage,
-        fieldId: String
+        fieldId: String,
+        pdfView: PDFView
     ) -> PDFAnnotation {
         // Try to find existing annotation by field name
         if let existing = page.annotations.first(where: { $0.fieldName == fieldId }) {
             return existing
         }
         
-        // Create new text widget annotation
+        // Convert backend coordinates to PDF coordinates
+        // Backend sends coordinates in PDF points (origin bottom-left)
+        let pageBounds = page.bounds(for: .mediaBox)
         let bounds = CGRect(
             x: region.x,
             y: region.y,
@@ -106,6 +140,8 @@ struct PDFKitRepresentedView: UIViewRepresentable {
         annotation.font = UIFont.systemFont(ofSize: 12)
         annotation.fontColor = .black
         annotation.backgroundColor = UIColor.white.withAlphaComponent(0.8)
+        annotation.border = PDFBorder()
+        annotation.border?.lineWidth = 1.0
         
         page.addAnnotation(annotation)
         
@@ -119,6 +155,8 @@ struct PDFKitRepresentedView: UIViewRepresentable {
         let fieldIdToUUID: [String: UUID]
         let onFieldTapped: (UUID) -> Void
         weak var pdfView: PDFView?
+        weak var containerView: UIView?
+        var overlayLayer: CALayer?
         
         init(
             formValues: Binding<[UUID: String]>,
@@ -130,6 +168,52 @@ struct PDFKitRepresentedView: UIViewRepresentable {
             self.fieldRegions = fieldRegions
             self.fieldIdToUUID = fieldIdToUUID
             self.onFieldTapped = onFieldTapped
+        }
+        
+        func drawFieldOverlays() {
+            guard let pdfView = pdfView,
+                  let document = pdfView.document,
+                  let overlayLayer = overlayLayer else {
+                return
+            }
+            
+            // Clear existing sublayers
+            overlayLayer.sublayers?.forEach { $0.removeFromSuperlayer() }
+            
+            // Draw a box for each field region
+            for region in fieldRegions {
+                guard let pageIndex = region.page,
+                      let page = document.page(at: pageIndex) else {
+                    continue
+                }
+                
+                // Convert PDF coordinates to view coordinates
+                let pdfBounds = CGRect(
+                    x: region.x,
+                    y: region.y,
+                    width: region.width,
+                    height: region.height
+                )
+                
+                let viewBounds = pdfView.convert(pdfBounds, from: page)
+                
+                // Create a shape layer for the field box
+                let boxLayer = CAShapeLayer()
+                boxLayer.frame = viewBounds
+                boxLayer.path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: viewBounds.size), cornerRadius: 4).cgPath
+                
+                // Check if this field has a value
+                let hasValue = formValues[fieldIdToUUID[region.fieldId] ?? UUID()] != nil && 
+                               !formValues[fieldIdToUUID[region.fieldId] ?? UUID()]!.isEmpty
+                
+                // Style the box
+                boxLayer.strokeColor = hasValue ? UIColor.systemGreen.cgColor : UIColor.systemBlue.cgColor
+                boxLayer.fillColor = UIColor.systemBlue.withAlphaComponent(0.1).cgColor
+                boxLayer.lineWidth = 2.0
+                boxLayer.lineDashPattern = [4, 4]
+                
+                overlayLayer.addSublayer(boxLayer)
+            }
         }
         
         func uuidToFieldId(_ uuid: UUID) -> String? {
