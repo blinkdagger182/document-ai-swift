@@ -151,19 +151,8 @@ class DocumentViewModel: ObservableObject {
         )
     }
     
-    // MARK: - Submit and Generate PDF
+    // MARK: - Submit and Generate PDF (Following Architecture Spec)
     func submitAndGeneratePDF() async {
-        guard let file = selectedFile else {
-            alertState = FillAlertState(
-                title: "Error",
-                message: "No document selected",
-                actions: [
-                    FillAlertAction(title: "OK", style: .default, handler: {})
-                ]
-            )
-            return
-        }
-        
         submitting = true
         
         do {
@@ -182,21 +171,50 @@ class DocumentViewModel: ObservableObject {
                 fileName: fileName
             )
             
-            // Call overlay API
-            _ = try await apiService.overlayPDF(
-                document: file,
+            // Step 1: Submit values to backend
+            let valueInputs = fieldRegions.compactMap { region -> FieldValueInput? in
+                guard let value = formData[region.fieldId], !value.isEmpty else {
+                    return nil
+                }
+                return FieldValueInput(
+                    fieldRegionId: region.id,
+                    value: value,
+                    source: "manual"
+                )
+            }
+            
+            _ = try await apiService.submitValues(
                 documentId: documentId,
-                formData: formData,
-                fieldRegions: fieldRegions
+                values: valueInputs
             )
+            
+            print("✅ Values submitted: \(valueInputs.count) fields")
+            
+            // Step 2: Start PDF composition
+            _ = try await apiService.composePDF(documentId: documentId)
+            
+            print("⏳ Waiting for PDF composition...")
+            
+            // Step 3: Poll until filled
+            _ = try await apiService.pollUntilFilled(documentId: documentId)
+            
+            // Step 4: Get download URL
+            let downloadResponse = try await apiService.downloadPDF(documentId: documentId)
+            
+            print("✅ PDF ready: \(downloadResponse.filledPdfUrl)")
             
             submitting = false
             
-            // Show success alert
+            // Show success alert with download option
             alertState = FillAlertState(
                 title: "Success!",
-                message: "Your document has been filled and saved.",
+                message: "Your filled PDF is ready for download.",
                 actions: [
+                    FillAlertAction(title: "Download", style: .default, handler: {
+                        Task {
+                            await self.downloadFilledPDF(url: downloadResponse.filledPdfUrl)
+                        }
+                    }),
                     FillAlertAction(title: "OK", style: .default, handler: {})
                 ]
             )
@@ -212,4 +230,64 @@ class DocumentViewModel: ObservableObject {
             )
         }
     }
+    
+    // MARK: - Download Filled PDF
+    private func downloadFilledPDF(url: String) async {
+        do {
+            guard let downloadURL = URL(string: url) else {
+                throw NSError(domain: "Invalid URL", code: -1)
+            }
+            
+            let (data, _) = try await URLSession.shared.data(from: downloadURL)
+            
+            // Save to temporary directory
+            let tempURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("filled_\(documentId).pdf")
+            
+            try data.write(to: tempURL)
+            
+            // Share the file
+            await MainActor.run {
+                let activityVC = UIActivityViewController(
+                    activityItems: [tempURL],
+                    applicationActivities: nil
+                )
+                
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let rootVC = windowScene.windows.first?.rootViewController {
+                    rootVC.present(activityVC, animated: true)
+                }
+            }
+            
+        } catch {
+            alertState = FillAlertState(
+                title: "Download Error",
+                message: error.localizedDescription,
+                actions: [
+                    FillAlertAction(title: "OK", style: .default, handler: {})
+                ]
+            )
+        }
+    }
+}
+
+// MARK: - Alert State Types
+
+struct FillAlertState: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+    let actions: [FillAlertAction]
+}
+
+struct FillAlertAction {
+    let title: String
+    let style: AlertActionStyle
+    let handler: () -> Void
+}
+
+enum AlertActionStyle {
+    case `default`
+    case cancel
+    case destructive
 }

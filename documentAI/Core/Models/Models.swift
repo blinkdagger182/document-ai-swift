@@ -32,20 +32,36 @@ struct DocumentModel: Identifiable, Codable {
 // MARK: - Field Component
 struct FieldComponent: Identifiable, Codable {
     let id: String
+    let fieldId: String?
     let type: FieldType
     let label: String
     let placeholder: String?
     let options: [String]?
     let value: AnyCodable?
+    let pageIndex: Int?
+    let defaultValue: String?
     
     enum CodingKeys: String, CodingKey {
-        case id, type, label, placeholder, options, value
+        case id, fieldId, type, label, placeholder, options, value, pageIndex, defaultValue
+    }
+    
+    init(id: String, fieldId: String? = nil, type: FieldType, label: String, placeholder: String? = nil, options: [String]? = nil, value: AnyCodable? = nil, pageIndex: Int? = nil, defaultValue: String? = nil) {
+        self.id = id
+        self.fieldId = fieldId ?? id
+        self.type = type
+        self.label = label
+        self.placeholder = placeholder
+        self.options = options
+        self.value = value
+        self.pageIndex = pageIndex
+        self.defaultValue = defaultValue
     }
 }
 
 enum FieldType: String, Codable {
     case text
     case textarea
+    case multiline
     case select
     case checkbox
     case button
@@ -53,6 +69,8 @@ enum FieldType: String, Codable {
     case number
     case email
     case phone
+    case signature
+    case unknown
 }
 
 // MARK: - AnyCodable for flexible JSON handling

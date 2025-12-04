@@ -7,42 +7,40 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A1000001 /* DocumentAIApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000001 /* DocumentAIApp.swift */; };
-		A1000002 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002 /* HomeView.swift */; };
-		A1000003 /* FillDocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000003 /* FillDocumentView.swift */; };
-		A1000004 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000004 /* HomeViewModel.swift */; };
-		A1000005 /* FillDocumentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000005 /* FillDocumentViewModel.swift */; };
-		A1000006 /* DocumentPickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000006 /* DocumentPickerService.swift */; };
-		A1000007 /* ImagePickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000007 /* ImagePickerService.swift */; };
-		A1000008 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000008 /* APIService.swift */; };
-		A1000009 /* LocalStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000009 /* LocalStorageService.swift */; };
-		A1000010 /* AnimatedGradientBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000010 /* AnimatedGradientBackground.swift */; };
-		A1000011 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000011 /* Models.swift */; };
-		A1000012 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000012 /* Theme.swift */; };
-		FC03BDB92EDFE96500CA1203 /* PDFKitRepresentedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC03BDB72EDFE96500CA1203 /* PDFKitRepresentedView.swift */; };
-		FC03BDBA2EDFE96500CA1203 /* LocalFormStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC03BDB62EDFE96500CA1203 /* LocalFormStorageService.swift */; };
-		FC03BDBB2EDFE96500CA1203 /* SplitScreenEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC03BDB82EDFE96500CA1203 /* SplitScreenEditorView.swift */; };
-		FC03BDBC2EDFE96500CA1203 /* DocumentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC03BDB52EDFE96500CA1203 /* DocumentViewModel.swift */; };
+		A1000001 /* App/DocumentAIApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000001 /* App/DocumentAIApp.swift */; };
+		A1000002 /* Features/Home/HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002 /* Features/Home/HomeView.swift */; };
+		A1000003 /* Features/DocumentEditor/FillDocumentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000003 /* Features/DocumentEditor/FillDocumentView.swift */; };
+		A1000004 /* Features/Home/HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000004 /* Features/Home/HomeViewModel.swift */; };
+		A1000006 /* Core/Services/DocumentPickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000006 /* Core/Services/DocumentPickerService.swift */; };
+		A1000007 /* Core/Services/ImagePickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000007 /* Core/Services/ImagePickerService.swift */; };
+		A1000008 /* Core/Services/APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000008 /* Core/Services/APIService.swift */; };
+		A1000009 /* Core/Services/LocalStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000009 /* Core/Services/LocalStorageService.swift */; };
+		A1000010 /* UI/Components/AnimatedGradientBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000010 /* UI/Components/AnimatedGradientBackground.swift */; };
+		A1000011 /* Core/Models/Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000011 /* Core/Models/Models.swift */; };
+		A1000012 /* UI/Theme/Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000012 /* UI/Theme/Theme.swift */; };
+		FC03BDB92EDFE96500CA1203 /* UI/Components/PDFKitRepresentedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC03BDB72EDFE96500CA1203 /* UI/Components/PDFKitRepresentedView.swift */; };
+		FC03BDBA2EDFE96500CA1203 /* Core/Services/LocalFormStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC03BDB62EDFE96500CA1203 /* Core/Services/LocalFormStorageService.swift */; };
+		FC03BDBB2EDFE96500CA1203 /* Features/DocumentEditor/SplitScreenEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC03BDB82EDFE96500CA1203 /* Features/DocumentEditor/SplitScreenEditorView.swift */; };
+		FC03BDBC2EDFE96500CA1203 /* Features/DocumentEditor/DocumentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC03BDB52EDFE96500CA1203 /* Features/DocumentEditor/DocumentViewModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		B1000001 /* DocumentAIApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentAIApp.swift; sourceTree = "<group>"; };
-		B1000002 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
-		B1000003 /* FillDocumentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FillDocumentView.swift; sourceTree = "<group>"; };
-		B1000004 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
-		B1000005 /* FillDocumentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FillDocumentViewModel.swift; sourceTree = "<group>"; };
-		B1000006 /* DocumentPickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPickerService.swift; sourceTree = "<group>"; };
-		B1000007 /* ImagePickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePickerService.swift; sourceTree = "<group>"; };
-		B1000008 /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
-		B1000009 /* LocalStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStorageService.swift; sourceTree = "<group>"; };
-		B1000010 /* AnimatedGradientBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedGradientBackground.swift; sourceTree = "<group>"; };
-		B1000011 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
-		B1000012 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		B1000001 /* App/DocumentAIApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/DocumentAIApp.swift; sourceTree = "<group>"; };
+		B1000002 /* Features/Home/HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/HomeView.swift; sourceTree = "<group>"; };
+		B1000003 /* Features/DocumentEditor/FillDocumentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/DocumentEditor/FillDocumentView.swift; sourceTree = "<group>"; };
+		B1000004 /* Features/Home/HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/HomeViewModel.swift; sourceTree = "<group>"; };
+		B1000006 /* Core/Services/DocumentPickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Services/DocumentPickerService.swift; sourceTree = "<group>"; };
+		B1000007 /* Core/Services/ImagePickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Services/ImagePickerService.swift; sourceTree = "<group>"; };
+		B1000008 /* Core/Services/APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Services/APIService.swift; sourceTree = "<group>"; };
+		B1000009 /* Core/Services/LocalStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Services/LocalStorageService.swift; sourceTree = "<group>"; };
+		B1000010 /* UI/Components/AnimatedGradientBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/Components/AnimatedGradientBackground.swift; sourceTree = "<group>"; };
+		B1000011 /* Core/Models/Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Models/Models.swift; sourceTree = "<group>"; };
+		B1000012 /* UI/Theme/Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/Theme/Theme.swift; sourceTree = "<group>"; };
 		C1000001 /* documentAI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = documentAI.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		FC03BDB52EDFE96500CA1203 /* DocumentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentViewModel.swift; sourceTree = "<group>"; };
-		FC03BDB62EDFE96500CA1203 /* LocalFormStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalFormStorageService.swift; sourceTree = "<group>"; };
-		FC03BDB72EDFE96500CA1203 /* PDFKitRepresentedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFKitRepresentedView.swift; sourceTree = "<group>"; };
-		FC03BDB82EDFE96500CA1203 /* SplitScreenEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitScreenEditorView.swift; sourceTree = "<group>"; };
+		FC03BDB52EDFE96500CA1203 /* Features/DocumentEditor/DocumentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/DocumentEditor/DocumentViewModel.swift; sourceTree = "<group>"; };
+		FC03BDB62EDFE96500CA1203 /* Core/Services/LocalFormStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Services/LocalFormStorageService.swift; sourceTree = "<group>"; };
+		FC03BDB72EDFE96500CA1203 /* UI/Components/PDFKitRepresentedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/Components/PDFKitRepresentedView.swift; sourceTree = "<group>"; };
+		FC03BDB82EDFE96500CA1203 /* Features/DocumentEditor/SplitScreenEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/DocumentEditor/SplitScreenEditorView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,22 +65,21 @@
 		E1000002 /* documentAI */ = {
 			isa = PBXGroup;
 			children = (
-				FC03BDB52EDFE96500CA1203 /* DocumentViewModel.swift */,
-				FC03BDB62EDFE96500CA1203 /* LocalFormStorageService.swift */,
-				FC03BDB72EDFE96500CA1203 /* PDFKitRepresentedView.swift */,
-				FC03BDB82EDFE96500CA1203 /* SplitScreenEditorView.swift */,
-				B1000001 /* DocumentAIApp.swift */,
-				B1000002 /* HomeView.swift */,
-				B1000003 /* FillDocumentView.swift */,
-				B1000004 /* HomeViewModel.swift */,
-				B1000005 /* FillDocumentViewModel.swift */,
-				B1000006 /* DocumentPickerService.swift */,
-				B1000007 /* ImagePickerService.swift */,
-				B1000008 /* APIService.swift */,
-				B1000009 /* LocalStorageService.swift */,
-				B1000010 /* AnimatedGradientBackground.swift */,
-				B1000011 /* Models.swift */,
-				B1000012 /* Theme.swift */,
+				FC03BDB52EDFE96500CA1203 /* Features/DocumentEditor/DocumentViewModel.swift */,
+				FC03BDB62EDFE96500CA1203 /* Core/Services/LocalFormStorageService.swift */,
+				FC03BDB72EDFE96500CA1203 /* UI/Components/PDFKitRepresentedView.swift */,
+				FC03BDB82EDFE96500CA1203 /* Features/DocumentEditor/SplitScreenEditorView.swift */,
+				B1000001 /* App/DocumentAIApp.swift */,
+				B1000002 /* Features/Home/HomeView.swift */,
+				B1000003 /* Features/DocumentEditor/FillDocumentView.swift */,
+				B1000004 /* Features/Home/HomeViewModel.swift */,
+				B1000006 /* Core/Services/DocumentPickerService.swift */,
+				B1000007 /* Core/Services/ImagePickerService.swift */,
+				B1000008 /* Core/Services/APIService.swift */,
+				B1000009 /* Core/Services/LocalStorageService.swift */,
+				B1000010 /* UI/Components/AnimatedGradientBackground.swift */,
+				B1000011 /* Core/Models/Models.swift */,
+				B1000012 /* UI/Theme/Theme.swift */,
 			);
 			path = documentAI;
 			sourceTree = "<group>";
@@ -158,22 +155,21 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1000001 /* DocumentAIApp.swift in Sources */,
-				A1000002 /* HomeView.swift in Sources */,
-				A1000003 /* FillDocumentView.swift in Sources */,
-				A1000004 /* HomeViewModel.swift in Sources */,
-				A1000005 /* FillDocumentViewModel.swift in Sources */,
-				A1000006 /* DocumentPickerService.swift in Sources */,
-				A1000007 /* ImagePickerService.swift in Sources */,
-				A1000008 /* APIService.swift in Sources */,
-				A1000009 /* LocalStorageService.swift in Sources */,
-				A1000010 /* AnimatedGradientBackground.swift in Sources */,
-				A1000011 /* Models.swift in Sources */,
-				A1000012 /* Theme.swift in Sources */,
-				FC03BDB92EDFE96500CA1203 /* PDFKitRepresentedView.swift in Sources */,
-				FC03BDBA2EDFE96500CA1203 /* LocalFormStorageService.swift in Sources */,
-				FC03BDBB2EDFE96500CA1203 /* SplitScreenEditorView.swift in Sources */,
-				FC03BDBC2EDFE96500CA1203 /* DocumentViewModel.swift in Sources */,
+				A1000001 /* App/DocumentAIApp.swift in Sources */,
+				A1000002 /* Features/Home/HomeView.swift in Sources */,
+				A1000003 /* Features/DocumentEditor/FillDocumentView.swift in Sources */,
+				A1000004 /* Features/Home/HomeViewModel.swift in Sources */,
+				A1000006 /* Core/Services/DocumentPickerService.swift in Sources */,
+				A1000007 /* Core/Services/ImagePickerService.swift in Sources */,
+				A1000008 /* Core/Services/APIService.swift in Sources */,
+				A1000009 /* Core/Services/LocalStorageService.swift in Sources */,
+				A1000010 /* UI/Components/AnimatedGradientBackground.swift in Sources */,
+				A1000011 /* Core/Models/Models.swift in Sources */,
+				A1000012 /* UI/Theme/Theme.swift in Sources */,
+				FC03BDB92EDFE96500CA1203 /* UI/Components/PDFKitRepresentedView.swift in Sources */,
+				FC03BDBA2EDFE96500CA1203 /* Core/Services/LocalFormStorageService.swift in Sources */,
+				FC03BDBB2EDFE96500CA1203 /* Features/DocumentEditor/SplitScreenEditorView.swift in Sources */,
+				FC03BDBC2EDFE96500CA1203 /* Features/DocumentEditor/DocumentViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

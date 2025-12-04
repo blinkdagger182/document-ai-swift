@@ -209,7 +209,7 @@ struct SplitScreenEditorView: View {
             switch component.type {
             case .text, .email, .phone, .number:
                 textFieldView(for: component, uuid: uuid)
-            case .textarea:
+            case .textarea, .multiline:
                 textAreaView(for: component, uuid: uuid)
             case .select:
                 selectView(for: component, uuid: uuid)
@@ -217,7 +217,9 @@ struct SplitScreenEditorView: View {
                 checkboxView(for: component, uuid: uuid)
             case .date:
                 dateFieldView(for: component, uuid: uuid)
-            case .button:
+            case .signature:
+                textFieldView(for: component, uuid: uuid)
+            case .button, .unknown:
                 EmptyView()
             }
         }
@@ -287,7 +289,7 @@ struct SplitScreenEditorView: View {
         ) {
             EmptyView()
         }
-        .toggleStyle(CheckboxToggleStyle())
+        .toggleStyle(SwitchToggleStyle())
     }
     
     // MARK: - Date Field View

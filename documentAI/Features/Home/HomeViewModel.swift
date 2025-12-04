@@ -53,7 +53,7 @@ class HomeViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Upload and Process
+    // MARK: - Upload and Process (Following Architecture Spec)
     func uploadAndProcess() async {
         guard let file = selectedFile else {
             alertState = AlertState(
@@ -67,23 +67,55 @@ class HomeViewModel: ObservableObject {
         progress = 0.0
         
         do {
-            let result = try await apiService.uploadAndProcessDocument(file: file) { progressValue in
+            // Step 1: Init Upload
+            let uploadResponse = try await apiService.initUpload(file: file) { progressValue in
                 self.progress = progressValue
             }
+            
+            documentId = uploadResponse.documentId
             
             uploading = false
             processing = true
             
-            // Store document ID, field map, and regions
-            documentId = result.documentId
-            components = result.components
-            fieldMap = result.fieldMap
-            fieldRegions = result.regions
-            pdfURL = result.pdfURL ?? file.url
+            // Step 2: Start Processing
+            _ = try await apiService.processDocument(documentId: documentId)
+            
+            // Step 3: Poll Until Ready
+            let detail = try await apiService.pollUntilReady(documentId: documentId)
+            
+            // Step 4: Extract components and fieldMap
+            components = detail.components
+            
+            // Convert FieldRegionDTO to FieldRegion
+            fieldRegions = detail.fieldMap.map { (fieldId, dto) in
+                FieldRegion(
+                    id: dto.id,
+                    fieldId: fieldId,
+                    x: dto.x,
+                    y: dto.y,
+                    width: dto.width,
+                    height: dto.height,
+                    page: dto.pageIndex,
+                    source: .ocr
+                )
+            }
+            
+            // Build fieldMap for compatibility
+            fieldMap = detail.fieldMap.reduce(into: [:]) { result, item in
+                result[item.key] = FieldMetadata(
+                    x: item.value.x,
+                    y: item.value.y,
+                    width: item.value.width,
+                    height: item.value.height,
+                    page: item.value.pageIndex
+                )
+            }
+            
+            pdfURL = file.url
             
             // Initialize form data with default values
             var initialFormData: FormData = [:]
-            for component in result.components {
+            for component in components {
                 if let value = component.value?.value as? String {
                     initialFormData[component.id] = value
                 } else {
@@ -105,17 +137,16 @@ class HomeViewModel: ObservableObject {
             processing = false
             showResults = true
             
+            print("✅ Document ready: \(components.count) fields, AcroForm: \(detail.document.acroform ?? false)")
+            
         } catch {
             uploading = false
             processing = false
             
-            print("❌ Upload error: \(error)")
-            print("   Error type: \(type(of: error))")
+            print("❌ Upload/Process error: \(error)")
             
             let errorMessage: String
-            if let decodingError = error as? DecodingError {
-                errorMessage = "Failed to parse server response. Please check logs."
-            } else if let apiError = error as? APIError {
+            if let apiError = error as? APIError {
                 errorMessage = apiError.localizedDescription
             } else {
                 errorMessage = error.localizedDescription

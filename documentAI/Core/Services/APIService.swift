@@ -2,8 +2,8 @@
 //  APIService.swift
 //  documentAI
 //
-//  Service for API calls (upload, process, overlay)
-//  Updated with real Cloud Run endpoints
+//  Service for API calls following the architecture spec
+//  API Contract: /api/v1/documents/*
 //
 
 import Foundation
@@ -11,16 +11,19 @@ import Foundation
 @MainActor
 class APIService: ObservableObject {
     
-    // Production Cloud Run endpoint
-    private let baseURL = "https://documentai-ocr-worker-824241800977.us-central1.run.app"
+    // MARK: - Configuration
+    // Deployed FastAPI backend URL
+    private let baseURL = "https://documentai-api-824241800977.us-central1.run.app"
     
-    // MARK: - Upload and Process Document
-    func uploadAndProcessDocument(
+    // MARK: - 1. Init Upload
+    /// POST /api/v1/documents/init-upload
+    /// Upload document and create database record
+    func initUpload(
         file: DocumentModel,
         progressHandler: @escaping (Double) -> Void
-    ) async throws -> ProcessResult {
+    ) async throws -> InitUploadResponse {
         
-        let url = URL(string: "\(baseURL)/ui/generate")!
+        let url = URL(string: "\(baseURL)/api/v1/documents/init-upload")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 120
@@ -58,89 +61,30 @@ class APIService: ObservableObject {
             throw APIError.invalidResponse
         }
         
-        guard httpResponse.statusCode == 200 else {
+        guard httpResponse.statusCode == 201 else {
             let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
-            print("❌ API Error (\(httpResponse.statusCode)): \(errorMessage)")
+            print("❌ Init Upload Error (\(httpResponse.statusCode)): \(errorMessage)")
             throw APIError.uploadFailed
         }
         
-        // Parse response
-        do {
-            // Debug: Print raw response
-            if let jsonString = String(data: data, encoding: .utf8) {
-                print("📥 API Response: \(jsonString.prefix(500))")
-            }
-            
-            let ocrResponse = try JSONDecoder().decode(OCRResponse.self, from: data)
-            print("✅ Decoded successfully: \(ocrResponse.components.count) components")
-            
-            // Convert to ProcessResult
-            return convertOCRResponseToProcessResult(ocrResponse, pdfURL: file.url)
-        } catch {
-            print("❌ Decoding error: \(error)")
-            if let decodingError = error as? DecodingError {
-                switch decodingError {
-                case .keyNotFound(let key, let context):
-                    print("   Missing key: \(key.stringValue) at \(context.codingPath)")
-                case .typeMismatch(let type, let context):
-                    print("   Type mismatch: expected \(type) at \(context.codingPath)")
-                case .valueNotFound(let type, let context):
-                    print("   Value not found: \(type) at \(context.codingPath)")
-                case .dataCorrupted(let context):
-                    print("   Data corrupted at \(context.codingPath)")
-                @unknown default:
-                    print("   Unknown decoding error")
-                }
-            }
-            throw error
-        }
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let uploadResponse = try decoder.decode(InitUploadResponse.self, from: data)
+        
+        print("✅ Document uploaded: \(uploadResponse.documentId)")
+        return uploadResponse
     }
     
-    // MARK: - Overlay PDF
-    func overlayPDF(
-        document: DocumentModel,
-        documentId: String,
-        formData: FormData,
-        fieldRegions: [FieldRegion]
-    ) async throws -> OverlayResult {
+    // MARK: - 2. Process Document
+    /// POST /api/v1/documents/{id}/process
+    /// Start OCR/AcroForm processing
+    func processDocument(documentId: String) async throws -> ProcessDocumentResponse {
         
-        let url = URL(string: "\(baseURL)/overlay")!
+        let url = URL(string: "\(baseURL)/api/v1/documents/\(documentId)/process")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = 120
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let boundary = UUID().uuidString
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        
-        var body = Data()
-        
-        // Add file data
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(document.name)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: \(document.mimeType)\r\n\r\n".data(using: .utf8)!)
-        
-        let fileData = try Data(contentsOf: document.url)
-        body.append(fileData)
-        body.append("\r\n".data(using: .utf8)!)
-        
-        // Add filled_data JSON
-        let filledData = createFilledDataPayload(
-            documentId: documentId,
-            formData: formData,
-            fieldRegions: fieldRegions
-        )
-        
-        let jsonData = try JSONSerialization.data(withJSONObject: filledData)
-        
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"filled_data\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: application/json\r\n\r\n".data(using: .utf8)!)
-        body.append(jsonData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-        
-        request.httpBody = body
-        
-        // Make request
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -149,175 +93,276 @@ class APIService: ObservableObject {
         
         guard httpResponse.statusCode == 200 else {
             let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
-            print("❌ Overlay Error (\(httpResponse.statusCode)): \(errorMessage)")
-            throw APIError.overlayFailed
+            print("❌ Process Error (\(httpResponse.statusCode)): \(errorMessage)")
+            throw APIError.processFailed
         }
         
-        // Save PDF to temp file
-        let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("filled_\(documentId).pdf")
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let processResponse = try decoder.decode(ProcessDocumentResponse.self, from: data)
         
-        try data.write(to: tempURL)
-        
-        return OverlayResult(localPdfURL: tempURL)
+        print("✅ Processing started: \(processResponse.status)")
+        return processResponse
     }
     
-    // MARK: - Helper Functions
-    
-    private func convertOCRResponseToProcessResult(_ response: OCRResponse, pdfURL: URL) -> ProcessResult {
-        // Convert OCR components to FieldComponents
-        var fieldComponents: [FieldComponent] = []
-        var fieldRegions: [FieldRegion] = []
+    // MARK: - 3. Get Document Details
+    /// GET /api/v1/documents/{id}
+    /// Poll for document status and get components/fieldMap when ready
+    func getDocument(documentId: String) async throws -> DocumentDetailResponse {
         
-        for component in response.components {
-            // Map component type
-            let fieldType: FieldType
-            switch component.type {
-            case "checkbox":
-                fieldType = .checkbox
-            case "input", "text_field":
-                fieldType = .text
-            default:
-                fieldType = .text
-            }
-            
-            // Create FieldComponent
-            let fieldComponent = FieldComponent(
-                id: component.id,
-                type: fieldType,
-                label: component.label,
-                placeholder: nil,
-                options: nil,
-                value: AnyCodable(component.value ?? "")
-            )
-            fieldComponents.append(fieldComponent)
-            
-            // Create FieldRegion from bbox
-            if let bbox = component.bbox, bbox.count == 8 {
-                let x = min(bbox[0], bbox[6])
-                let y = min(bbox[1], bbox[3])
-                let width = max(bbox[2], bbox[4]) - x
-                let height = max(bbox[5], bbox[7]) - y
-                
-                let fieldRegion = FieldRegion(
-                    fieldId: component.id,
-                    x: x,
-                    y: y,
-                    width: width,
-                    height: height,
-                    page: component.page > 0 ? component.page - 1 : 0, // Convert to 0-indexed
-                    source: .ocr
-                )
-                fieldRegions.append(fieldRegion)
-            }
+        let url = URL(string: "\(baseURL)/api/v1/documents/\(documentId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
         }
         
-        return ProcessResult(
-            documentId: UUID().uuidString,
-            components: fieldComponents,
-            fieldMap: [:],
-            fieldRegions: fieldRegions,
-            pdfURL: pdfURL
-        )
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            print("❌ Get Document Error (\(httpResponse.statusCode)): \(errorMessage)")
+            throw APIError.fetchFailed
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let detailResponse = try decoder.decode(DocumentDetailResponse.self, from: data)
+        
+        print("✅ Document fetched: status=\(detailResponse.document.status), fields=\(detailResponse.components.count)")
+        return detailResponse
     }
     
-    private func createFilledDataPayload(
+    // MARK: - 4. Submit Values
+    /// POST /api/v1/documents/{id}/values
+    /// Submit user-entered field values
+    func submitValues(
         documentId: String,
-        formData: FormData,
-        fieldRegions: [FieldRegion]
-    ) -> [String: Any] {
-        var fieldMap: [String: [String: Any]] = [:]
+        values: [FieldValueInput]
+    ) async throws -> SubmitValuesResponse {
         
-        for region in fieldRegions {
-            fieldMap[region.fieldId] = [
-                "bbox": [
-                    region.x, region.y,
-                    region.x + region.width, region.y,
-                    region.x + region.width, region.y + region.height,
-                    region.x, region.y + region.height
-                ],
-                "page": (region.page ?? 0) + 1, // Convert back to 1-indexed
-                "type": "text_field"
-            ]
+        let url = URL(string: "\(baseURL)/api/v1/documents/\(documentId)/values")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let payload = SubmitValuesRequest(values: values)
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        request.httpBody = try encoder.encode(payload)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
         }
         
-        return [
-            "documentId": documentId,
-            "values": formData,
-            "fieldMap": fieldMap
-        ]
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            print("❌ Submit Values Error (\(httpResponse.statusCode)): \(errorMessage)")
+            throw APIError.submitFailed
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let submitResponse = try decoder.decode(SubmitValuesResponse.self, from: data)
+        
+        print("✅ Values submitted: \(values.count) fields")
+        return submitResponse
+    }
+    
+    // MARK: - 5. Compose PDF
+    /// POST /api/v1/documents/{id}/compose
+    /// Generate filled PDF
+    func composePDF(documentId: String) async throws -> ProcessDocumentResponse {
+        
+        let url = URL(string: "\(baseURL)/api/v1/documents/\(documentId)/compose")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            print("❌ Compose Error (\(httpResponse.statusCode)): \(errorMessage)")
+            throw APIError.composeFailed
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let composeResponse = try decoder.decode(ProcessDocumentResponse.self, from: data)
+        
+        print("✅ PDF composition started")
+        return composeResponse
+    }
+    
+    // MARK: - 6. Download Filled PDF
+    /// GET /api/v1/documents/{id}/download
+    /// Get presigned URL for filled PDF
+    func downloadPDF(documentId: String) async throws -> DownloadResponse {
+        
+        let url = URL(string: "\(baseURL)/api/v1/documents/\(documentId)/download")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            print("❌ Download Error (\(httpResponse.statusCode)): \(errorMessage)")
+            throw APIError.downloadFailed
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let downloadResponse = try decoder.decode(DownloadResponse.self, from: data)
+        
+        print("✅ Download URL received")
+        return downloadResponse
+    }
+    
+    // MARK: - Helper: Poll Until Ready
+    /// Poll document status until it reaches 'ready' state
+    func pollUntilReady(documentId: String, maxAttempts: Int = 60) async throws -> DocumentDetailResponse {
+        for attempt in 1...maxAttempts {
+            let detail = try await getDocument(documentId: documentId)
+            
+            if detail.document.status == "ready" {
+                return detail
+            } else if detail.document.status == "failed" {
+                throw APIError.processingFailed(detail.document.errorMessage ?? "Unknown error")
+            }
+            
+            print("⏳ Polling attempt \(attempt)/\(maxAttempts): status=\(detail.document.status)")
+            try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+        }
+        
+        throw APIError.timeout
+    }
+    
+    // MARK: - Helper: Poll Until Filled
+    /// Poll document status until PDF composition is complete
+    func pollUntilFilled(documentId: String, maxAttempts: Int = 60) async throws -> DocumentDetailResponse {
+        for attempt in 1...maxAttempts {
+            let detail = try await getDocument(documentId: documentId)
+            
+            if detail.document.status == "filled" {
+                return detail
+            } else if detail.document.status == "failed" {
+                throw APIError.processingFailed(detail.document.errorMessage ?? "Unknown error")
+            }
+            
+            print("⏳ Polling composition \(attempt)/\(maxAttempts): status=\(detail.document.status)")
+            try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+        }
+        
+        throw APIError.timeout
     }
 }
 
 // MARK: - API Response Models
 
-struct OCRResponse: Codable {
-    let success: Bool
-    let components: [OCRComponent]
-    let fieldMap: [String: OCRFieldInfo]?
-    let metadata: OCRMetadata?
+struct InitUploadResponse: Codable {
+    let documentId: String
+    let document: DocumentSummary
 }
 
-struct OCRComponent: Codable {
+struct DocumentSummary: Codable {
     let id: String
-    let type: String
-    let label: String
-    let valueRaw: AnyCodable?
-    let bbox: [Double]?
-    let page: Int
-    
-    enum CodingKeys: String, CodingKey {
-        case id, type, label, bbox, page
-        case valueRaw = "value"
-    }
-    
-    // Computed property to get value as string
-    var value: String? {
-        if let val = valueRaw?.value {
-            if let boolVal = val as? Bool {
-                return boolVal ? "true" : "false"
-            } else if let stringVal = val as? String {
-                return stringVal
-            } else {
-                return String(describing: val)
-            }
-        }
-        return nil
-    }
+    let fileName: String
+    let mimeType: String
+    let status: String
+    let pageCount: Int?
+    let acroform: Bool?
+    let createdAt: String
+    let errorMessage: String?
 }
 
-struct OCRFieldInfo: Codable {
-    let bbox: [Double]
-    let page: Int
-    let type: String
+struct ProcessDocumentResponse: Codable {
+    let documentId: String
+    let status: String
 }
 
-struct OCRMetadata: Codable {
-    let pages: [PageInfo]?
-    let total_pages: Int?
-    let total_fields: Int?
+struct DocumentDetailResponse: Codable {
+    let document: DocumentSummary
+    let components: [FieldComponent]
+    let fieldMap: [String: FieldRegionDTO]
 }
 
-struct PageInfo: Codable {
-    let page: Int
+struct FieldRegionDTO: Codable {
+    let id: String
+    let pageIndex: Int
+    let x: Double
+    let y: Double
     let width: Double
     let height: Double
+    let fieldType: String
+    let label: String
+    let confidence: Double
+}
+
+struct SubmitValuesRequest: Codable {
+    let values: [FieldValueInput]
+}
+
+struct FieldValueInput: Codable {
+    let fieldRegionId: String
+    let value: String
+    let source: String // "manual", "autofill", "ai"
+}
+
+struct SubmitValuesResponse: Codable {
+    let documentId: String
+    let status: String
+}
+
+struct DownloadResponse: Codable {
+    let documentId: String
+    let filledPdfUrl: String
 }
 
 // MARK: - API Errors
 enum APIError: LocalizedError {
     case uploadFailed
-    case overlayFailed
+    case processFailed
+    case fetchFailed
+    case submitFailed
+    case composeFailed
+    case downloadFailed
+    case processingFailed(String)
     case invalidResponse
+    case timeout
     
     var errorDescription: String? {
         switch self {
         case .uploadFailed:
             return "Failed to upload document"
-        case .overlayFailed:
-            return "Failed to generate filled PDF"
+        case .processFailed:
+            return "Failed to start processing"
+        case .fetchFailed:
+            return "Failed to fetch document details"
+        case .submitFailed:
+            return "Failed to submit values"
+        case .composeFailed:
+            return "Failed to start PDF composition"
+        case .downloadFailed:
+            return "Failed to get download URL"
+        case .processingFailed(let message):
+            return "Processing failed: \(message)"
         case .invalidResponse:
             return "Invalid server response"
+        case .timeout:
+            return "Request timed out"
         }
     }
 }
