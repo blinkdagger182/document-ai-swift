@@ -2,7 +2,8 @@
 //  PDFKitRepresentedView.swift
 //  documentAI
 //
-//  PDFKit wrapper with two-way binding to formValues
+//  PDFKit wrapper with two-way binding to formValues,
+//  tuned to behave like iOS Files.app.
 //
 
 import SwiftUI
@@ -16,124 +17,6 @@ struct PDFKitRepresentedView: UIViewRepresentable {
     let onFieldTapped: (UUID) -> Void
     let pdfViewSize: CGSize
     
-    func makeUIView(context: Context) -> UIView {
-        let containerView = UIView()
-        
-        let pdfView = PDFView()
-        pdfView.autoScales = true
-        pdfView.displayMode = .singlePageContinuous
-        pdfView.displayDirection = .vertical
-        pdfView.backgroundColor = .clear
-        
-        // Enable interactive form editing (like Files app)
-        if #available(iOS 16.0, *) {
-            pdfView.isInMarkupMode = false
-        }
-        
-        // Load PDF document
-        if let document = PDFDocument(url: pdfURL) {
-            pdfView.document = document
-            
-            // Check if PDF has native form fields
-            var hasNativeFields = false
-            for pageIndex in 0..<document.pageCount {
-                if let page = document.page(at: pageIndex),
-                   !page.annotations.isEmpty {
-                    hasNativeFields = true
-                    print("📄 PDF has \(page.annotations.count) native annotations on page \(pageIndex)")
-                    break
-                }
-            }
-            
-            if hasNativeFields {
-                print("✅ PDF has native form fields - will use them directly")
-            } else {
-                print("⚠️ PDF has no native form fields - will create annotations")
-            }
-            
-            // Add tap gesture recognizer for field overlays
-            let tapGesture = UITapGestureRecognizer(
-                target: context.coordinator,
-                action: #selector(Coordinator.handleTap(_:))
-            )
-            pdfView.addGestureRecognizer(tapGesture)
-            
-            // Listen for annotation changes
-            NotificationCenter.default.addObserver(
-                context.coordinator,
-                selector: #selector(Coordinator.annotationChanged(_:)),
-                name: .PDFViewAnnotationHit,
-                object: pdfView
-            )
-            
-            context.coordinator.pdfView = pdfView
-            context.coordinator.containerView = containerView
-            
-            // Create overlay layer for field boxes
-            let overlayLayer = CALayer()
-            overlayLayer.name = "fieldOverlay"
-            context.coordinator.overlayLayer = overlayLayer
-            
-            containerView.addSubview(pdfView)
-            containerView.layer.addSublayer(overlayLayer)
-            
-            pdfView.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                pdfView.topAnchor.constraint(equalTo: containerView.topAnchor),
-                pdfView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-                pdfView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-                pdfView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
-            ])
-            
-            // Update native fields after a short delay to ensure PDF is loaded
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                context.coordinator.updateNativeFields()
-            }
-        }
-        
-        return containerView
-    }
-    
-    func updateUIView(_ containerView: UIView, context: Context) {
-        guard let pdfView = context.coordinator.pdfView,
-              let document = pdfView.document else { return }
-        
-        // First, try to update native PDF form fields
-        context.coordinator.updateNativeFields()
-        
-        // Then update our custom annotations
-        for (uuid, value) in formValues {
-            // Find the field region for this UUID
-            guard let fieldId = context.coordinator.uuidToFieldId(uuid),
-                  let region = fieldRegions.first(where: { $0.fieldId == fieldId }),
-                  let pageIndex = region.page,
-                  let page = document.page(at: pageIndex) else {
-                continue
-            }
-            
-            // Find or create annotation for this field
-            guard let annotation = findOrCreateAnnotation(
-                for: region,
-                on: page,
-                fieldId: fieldId,
-                pdfView: pdfView
-            ) else {
-                continue
-            }
-            
-            // Update annotation value if changed
-            let currentValue = annotation.widgetStringValue ?? ""
-            if currentValue != value {
-                annotation.widgetStringValue = value
-                
-                // Notify PDFView to refresh the annotation with new appearance stream
-                pdfView.setNeedsDisplay(annotation.bounds)
-            }
-        }
-        
-        // No need to redraw overlays - using native widgets
-    }
-    
     func makeCoordinator() -> Coordinator {
         Coordinator(
             formValues: $formValues,
@@ -143,92 +26,90 @@ struct PDFKitRepresentedView: UIViewRepresentable {
         )
     }
     
-    // MARK: - Find or Create Annotation
-    private func findOrCreateAnnotation(
-        for region: FieldRegion,
-        on page: PDFPage,
-        fieldId: String,
-        pdfView: PDFView
-    ) -> PDFAnnotation? {
-        // Try to find existing annotation by field name
-        if let existing = page.annotations.first(where: { $0.fieldName == fieldId }) {
-            return existing
+    func makeUIView(context: Context) -> UIView {
+        let containerView = UIView()
+        
+        let pdfView = PDFView()
+        pdfView.autoScales = true
+        pdfView.displayMode = .singlePageContinuous
+        pdfView.displayDirection = .vertical
+        pdfView.backgroundColor = .clear
+        
+        if #available(iOS 16.0, *) {
+            // We want form-style behavior, not markup mode
+            pdfView.isInMarkupMode = false
         }
         
-        // Validate coordinates before creating annotation
-        guard region.x.isFinite && region.y.isFinite && 
-              region.width.isFinite && region.height.isFinite &&
-              region.width > 0 && region.height > 0 else {
-            print("⚠️ Cannot create annotation for field \(fieldId) - invalid coordinates")
-            return nil
+        // Load PDF document
+        if let document = PDFDocument(url: pdfURL) {
+            pdfView.document = document
+            
+            // Detect native AcroForm fields
+            var hasNativeFields = false
+            for pageIndex in 0..<document.pageCount {
+                guard let page = document.page(at: pageIndex) else { continue }
+                if page.annotations.contains(where: { $0.widgetFieldType == .text }) {
+                    hasNativeFields = true
+                    print("📄 Page \(pageIndex) has native widget annotations: \(page.annotations.count)")
+                    break
+                }
+            }
+            context.coordinator.hasNativeFields = hasNativeFields
+            context.coordinator.pdfView = pdfView
+            context.coordinator.containerView = containerView
+            
+            // Build annotation map (native or synthetic) once
+            context.coordinator.installAnnotationsIfNeeded()
+            
+            // Tap gesture to focus a field
+            let tapGesture = UITapGestureRecognizer(
+                target: context.coordinator,
+                action: #selector(Coordinator.handleTap(_:))
+            )
+            pdfView.addGestureRecognizer(tapGesture)
+            
+            containerView.addSubview(pdfView)
+            pdfView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                pdfView.topAnchor.constraint(equalTo: containerView.topAnchor),
+                pdfView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                pdfView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+                pdfView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+            ])
         }
         
-        // Get page dimensions
-        let pageBounds = page.bounds(for: .mediaBox)
-        let pageWidth = pageBounds.width
-        let pageHeight = pageBounds.height
+        return containerView
+    }
+    
+    func updateUIView(_ containerView: UIView, context: Context) {
+        guard let pdfView = context.coordinator.pdfView,
+              pdfView.document != nil else { return }
         
-        // Convert normalized coordinates (0-1) to PDF points
-        // Backend sends normalized coordinates, PDF uses bottom-left origin
-        let pdfX = region.x * pageWidth
-        let pdfY = region.y * pageHeight
-        let pdfWidth = region.width * pageWidth
-        let pdfHeight = region.height * pageHeight
+        // Keep annotation map in sync (e.g. after reload)
+        context.coordinator.installAnnotationsIfNeeded()
         
-        let bounds = CGRect(
-            x: pdfX,
-            y: pdfY,
-            width: pdfWidth,
-            height: pdfHeight
-        )
-        
-        print("📍 Creating annotation for \(fieldId): normalized(\(region.x), \(region.y), \(region.width), \(region.height)) -> pdf(\(pdfX), \(pdfY), \(pdfWidth), \(pdfHeight))")
-        
-        // Create native Widget annotation (like Files app)
-        let annotation = PDFAnnotation(
-            bounds: bounds,
-            forType: .widget,
-            withProperties: nil
-        )
-        
-        // Set widget properties for text field
-        annotation.fieldName = fieldId
-        annotation.widgetFieldType = .text
-        annotation.font = UIFont.systemFont(ofSize: 10)
-        annotation.fontColor = .black
-        
-        // Transparent background (like Files app)
-        annotation.backgroundColor = .clear
-        annotation.color = .clear
-        
-        // Thin border for visibility
-        let border = PDFBorder()
-        border.lineWidth = 0.5
-        border.style = .solid
-        annotation.border = border
-        
-        // Make it editable
-        annotation.isReadOnly = false
-        
-        // Set appearance characteristics for better rendering
-        annotation.setValue("Tx", forAnnotationKey: PDFAnnotationKey(rawValue: "/FT"))
-        
-        page.addAnnotation(annotation)
-        
-        return annotation
+        // Push SwiftUI formValues into widget annotations
+        context.coordinator.syncAnnotationsWithFormValues()
     }
     
     // MARK: - Coordinator
+    
     class Coordinator: NSObject, UITextFieldDelegate {
         @Binding var formValues: [UUID: String]
         let fieldRegions: [FieldRegion]
         let fieldIdToUUID: [String: UUID]
         let onFieldTapped: (UUID) -> Void
+        
         weak var pdfView: PDFView?
         weak var containerView: UIView?
-        var overlayLayer: CALayer?
         
-        // Native editor state
+        /// true if the PDF already has AcroForm fields
+        var hasNativeFields: Bool = false
+        
+        /// fieldId (String) -> annotation
+        var annotationMap: [String: PDFAnnotation] = [:]
+        
+        // Active inline editor
         var activeEditor: UITextField?
         var activeAnnotation: PDFAnnotation?
         var activeFieldId: String?
@@ -245,229 +126,164 @@ struct PDFKitRepresentedView: UIViewRepresentable {
             self.onFieldTapped = onFieldTapped
         }
         
-        func drawFieldOverlays() {
-            guard let pdfView = pdfView,
-                  let document = pdfView.document,
-                  let overlayLayer = overlayLayer else {
-                return
-            }
-            
-            // Clear existing sublayers
-            overlayLayer.sublayers?.forEach { $0.removeFromSuperlayer() }
-            
-            // Draw a box for each field region
-            for region in fieldRegions {
-                guard let pageIndex = region.page,
-                      let page = document.page(at: pageIndex) else {
-                    continue
-                }
-                
-                // Validate coordinates - skip if invalid
-                guard region.x.isFinite && region.y.isFinite && 
-                      region.width.isFinite && region.height.isFinite &&
-                      region.width > 0 && region.height > 0 else {
-                    print("⚠️ Skipping field \(region.fieldId) - invalid coordinates: x=\(region.x), y=\(region.y), w=\(region.width), h=\(region.height)")
-                    continue
-                }
-                
-                // Get page dimensions
-                let pageBounds = page.bounds(for: .mediaBox)
-                let pageWidth = pageBounds.width
-                let pageHeight = pageBounds.height
-                
-                // Convert normalized coordinates (0-1) to PDF points
-                let pdfX = region.x * pageWidth
-                let pdfY = region.y * pageHeight
-                let pdfWidth = region.width * pageWidth
-                let pdfHeight = region.height * pageHeight
-                
-                let pdfBounds = CGRect(
-                    x: pdfX,
-                    y: pdfY,
-                    width: pdfWidth,
-                    height: pdfHeight
-                )
-                
-                let viewBounds = pdfView.convert(pdfBounds, from: page)
-                
-                // Validate converted bounds
-                guard viewBounds.origin.x.isFinite && viewBounds.origin.y.isFinite &&
-                      viewBounds.size.width.isFinite && viewBounds.size.height.isFinite &&
-                      viewBounds.size.width > 0 && viewBounds.size.height > 0 else {
-                    print("⚠️ Skipping field \(region.fieldId) - invalid view bounds after conversion")
-                    continue
-                }
-                
-                // Create a shape layer for the field box
-                let boxLayer = CAShapeLayer()
-                boxLayer.frame = viewBounds
-                boxLayer.path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: viewBounds.size), cornerRadius: 4).cgPath
-                
-                // Check if this field has a value
-                let hasValue = formValues[fieldIdToUUID[region.fieldId] ?? UUID()] != nil && 
-                               !formValues[fieldIdToUUID[region.fieldId] ?? UUID()]!.isEmpty
-                
-                // Style the box
-                boxLayer.strokeColor = hasValue ? UIColor.systemGreen.cgColor : UIColor.systemBlue.cgColor
-                boxLayer.fillColor = UIColor.systemBlue.withAlphaComponent(0.1).cgColor
-                boxLayer.lineWidth = 2.0
-                boxLayer.lineDashPattern = [4, 4]
-                
-                overlayLayer.addSublayer(boxLayer)
-            }
-        }
+        // MARK: Annotation installation
         
-        func uuidToFieldId(_ uuid: UUID) -> String? {
-            return fieldIdToUUID.first(where: { $0.value == uuid })?.key
-        }
-        
-        func updateNativeFields() {
+        /// Ensure annotationMap is populated either from native AcroForm
+        /// fields or by creating widget annotations for static PDFs.
+        func installAnnotationsIfNeeded() {
             guard let pdfView = pdfView,
                   let document = pdfView.document else { return }
             
-            // Try to update native PDF form fields if they exist
-            for pageIndex in 0..<document.pageCount {
-                guard let page = document.page(at: pageIndex) else { continue }
-                
-                for annotation in page.annotations {
-                    // Check if this is a widget annotation (form field)
-                    if annotation.type == "Widget" {
-                        let fieldName = annotation.fieldName ?? ""
-                        print("📝 Found native field: \(fieldName)")
-                        
-                        // Try to match with our field regions
-                        if let uuid = fieldIdToUUID[fieldName],
-                           let value = formValues[uuid] {
-                            annotation.widgetStringValue = value
-                            print("✅ Updated native field \(fieldName) with value: \(value)")
+            if !annotationMap.isEmpty { return } // already done
+            
+            if hasNativeFields {
+                // Map existing widget annotations by fieldName
+                for pageIndex in 0..<document.pageCount {
+                    guard let page = document.page(at: pageIndex) else { continue }
+                    for annotation in page.annotations where annotation.widgetFieldType == .text {
+                        if let name = annotation.fieldName {
+                            annotationMap[name] = annotation
+                            print("🧬 Mapped native annotation \(name)")
                         }
                     }
+                }
+            } else {
+                // No native fields: create widget annotations from fieldRegions
+                for region in fieldRegions {
+                    guard let pageIndex = region.page,
+                          let page = document.page(at: pageIndex) else {
+                        continue
+                    }
+                    guard region.x.isFinite, region.y.isFinite,
+                          region.width.isFinite, region.height.isFinite,
+                          region.width > 0, region.height > 0 else {
+                        print("⚠️ Cannot create annotation for \(region.fieldId) - invalid normalized coords")
+                        continue
+                    }
+                    
+                    let bounds = Self.normalizedToPDFRect(region: region, on: page)
+                    let annotation = PDFAnnotation(
+                        bounds: bounds,
+                        forType: .widget,
+                        withProperties: nil
+                    )
+                    annotation.widgetFieldType = .text
+                    annotation.fieldName = region.fieldId
+                    annotation.font = UIFont.systemFont(ofSize: 12)
+                    annotation.fontColor = .black
+                    annotation.backgroundColor = .clear
+                    annotation.color = .clear
+                    
+                    let border = PDFBorder()
+                    border.lineWidth = 0.5
+                    border.style = .solid
+                    annotation.border = border
+                    
+                    page.addAnnotation(annotation)
+                    annotationMap[region.fieldId] = annotation
+                    
+                    print("🆕 Created synthetic widget for \(region.fieldId) at \(bounds)")
                 }
             }
         }
         
-        @objc func annotationChanged(_ notification: Notification) {
-            guard let annotation = notification.userInfo?["PDFAnnotationHit"] as? PDFAnnotation else {
-                return
-            }
+        /// Push SwiftUI form values into PDF annotations & redraw them.
+        func syncAnnotationsWithFormValues() {
+            guard let pdfView = pdfView else { return }
             
-            guard let fieldName = annotation.fieldName,
-                  let uuid = fieldIdToUUID[fieldName],
-                  let newValue = annotation.widgetStringValue else {
-                return
-            }
-            
-            // Update formValues when user types directly in PDF widget
-            if formValues[uuid] != newValue {
-                formValues[uuid] = newValue
-                print("📝 Widget field changed: \(fieldName) = \(newValue)")
+            for (fieldId, uuid) in fieldIdToUUID {
+                guard let annotation = annotationMap[fieldId] else { continue }
+                let newValue = formValues[uuid] ?? ""
+                let current = annotation.widgetStringValue ?? ""
+                if newValue != current {
+                    annotation.widgetStringValue = newValue
+                    if let page = annotation.page {
+                        // Force redraw of the annotation area
+                        let viewBounds = pdfView.convert(annotation.bounds, from: page)
+                        pdfView.setNeedsDisplay(viewBounds)
+                    }
+                    print("🔁 Sync \(fieldId) -> '\(newValue)'")
+                }
             }
         }
+        
+        // MARK: - Tap handling
         
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
             guard let pdfView = pdfView,
                   let document = pdfView.document else { return }
             
-            let location = gesture.location(in: pdfView)
+            let locationInView = gesture.location(in: pdfView)
+            guard let page = pdfView.page(for: locationInView, nearest: true) else { return }
+            let pagePoint = pdfView.convert(locationInView, to: page)
             
-            // Convert to PDF coordinates
-            guard let page = pdfView.page(for: location, nearest: true) else {
-                return
-            }
-            
-            let pagePoint = pdfView.convert(location, to: page)
-            
-            // Check if tap is on an existing annotation
+            // 1) Check if tap hits an existing annotation
             for annotation in page.annotations {
                 if annotation.bounds.contains(pagePoint),
                    let fieldName = annotation.fieldName {
                     showNativeEditor(for: annotation, fieldId: fieldName, page: page)
+                    if let uuid = fieldIdToUUID[fieldName] {
+                        onFieldTapped(uuid)
+                    }
                     return
                 }
             }
             
-            // Check if tap is within any field region (for creating new annotations)
+            // 2) Otherwise, check if tap is inside any fieldRegion (for safety)
             for region in fieldRegions {
                 guard let pageIndex = region.page,
-                      let currentPage = document.page(at: pageIndex),
-                      currentPage == page else {
-                    continue
-                }
+                      let regionPage = document.page(at: pageIndex),
+                      regionPage == page else { continue }
                 
-                // Get page dimensions
-                let pageBounds = page.bounds(for: .mediaBox)
-                let pageWidth = pageBounds.width
-                let pageHeight = pageBounds.height
-                
-                // Convert normalized coordinates to PDF points
-                let pdfX = region.x * pageWidth
-                let pdfY = region.y * pageHeight
-                let pdfWidth = region.width * pageWidth
-                let pdfHeight = region.height * pageHeight
-                
-                let fieldBounds = CGRect(
-                    x: pdfX,
-                    y: pdfY,
-                    width: pdfWidth,
-                    height: pdfHeight
-                )
-                
-                if fieldBounds.contains(pagePoint) {
-                    // Find or create annotation
-                    if let annotation = page.annotations.first(where: { $0.fieldName == region.fieldId }) {
-                        showNativeEditor(for: annotation, fieldId: region.fieldId, page: page)
+                let pdfBounds = Self.normalizedToPDFRect(region: region, on: page)
+                if pdfBounds.contains(pagePoint) {
+                    let fieldId = region.fieldId
+                    if let annotation = annotationMap[fieldId] {
+                        showNativeEditor(for: annotation, fieldId: fieldId, page: page)
                     }
-                    
-                    // Notify parent
-                    if let uuid = fieldIdToUUID[region.fieldId] {
+                    if let uuid = fieldIdToUUID[fieldId] {
                         onFieldTapped(uuid)
                     }
-                    break
+                    return
                 }
             }
         }
         
-        // MARK: - Native Editor (Files.app style)
+        // MARK: - Native editor (Files.app style overlay)
+        
         func showNativeEditor(for annotation: PDFAnnotation, fieldId: String, page: PDFPage) {
             guard let pdfView = pdfView else { return }
             
-            // Close existing editor
             closeNativeEditor()
             
-            // Convert annotation bounds to view coordinates
+            // Convert widget bounds (page coords) to view coords
             let viewRect = pdfView.convert(annotation.bounds, from: page)
             
-            // Create UITextField overlay
             let editor = UITextField(frame: viewRect)
             editor.text = annotation.widgetStringValue ?? ""
-            editor.font = UIFont.systemFont(ofSize: 10)
-            editor.textColor = .black
+            editor.font = UIFont.systemFont(ofSize: 12)
+            editor.textColor = UIColor.black
             editor.backgroundColor = UIColor.white.withAlphaComponent(0.95)
             editor.layer.cornerRadius = 4
-            editor.layer.borderWidth = 2
+            editor.layer.borderWidth = 1.5
             editor.layer.borderColor = UIColor.systemBlue.cgColor
-            editor.autocorrectionType = .no
+            editor.autocorrectionType = UITextAutocorrectionType.no
             editor.delegate = self
-            editor.tag = fieldId.hashValue
             
-            // Add padding
-            let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 8, height: viewRect.height))
+            let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 6, height: viewRect.height))
             editor.leftView = paddingView
-            editor.leftViewMode = .always
+            editor.leftViewMode = UITextField.ViewMode.always
             
-            // Add to PDF view
             pdfView.addSubview(editor)
             editor.becomeFirstResponder()
             
-            // Store references
             activeEditor = editor
             activeAnnotation = annotation
             activeFieldId = fieldId
             
-            // Listen for text changes
-            editor.addTarget(self, action: #selector(editorTextChanged(_:)), for: .editingChanged)
+            editor.addTarget(self, action: #selector(editorTextChanged(_:)), for: UIControl.Event.editingChanged)
             
-            print("✏️ Opened native editor for field: \(fieldId)")
+            print("✏️ Opened editor for \(fieldId)")
         }
         
         func closeNativeEditor() {
@@ -486,20 +302,21 @@ struct PDFKitRepresentedView: UIViewRepresentable {
             }
             
             let newValue = sender.text ?? ""
-            
-            // Update annotation (this also clears appearance stream)
+            // Update annotation & force appearance stream refresh
             annotation.widgetStringValue = newValue
-            
-            // Update form values
             formValues[uuid] = newValue
             
-            // Force PDFKit to redraw with new appearance stream
-            pdfView.setNeedsDisplay(annotation.bounds)
+            if let page = annotation.page {
+                // Force redraw of the annotation area
+                let viewBounds = pdfView.convert(annotation.bounds, from: page)
+                pdfView.setNeedsDisplay(viewBounds)
+            }
             
-            print("📝 Editor text changed: \(fieldId) = \(newValue)")
+            print("📝 \(fieldId) = \(newValue)")
         }
         
         // MARK: - UITextFieldDelegate
+        
         func textFieldDidEndEditing(_ textField: UITextField) {
             closeNativeEditor()
         }
@@ -508,10 +325,34 @@ struct PDFKitRepresentedView: UIViewRepresentable {
             textField.resignFirstResponder()
             return true
         }
+        
+        // MARK: - Helpers
+        
+        /// Assumes backend normalized coords use TOP-LEFT origin.
+        /// Converts [0,1] normalized (x, y, w, h) → PDF page rect (bottom-left origin).
+        static func normalizedToPDFRect(region: FieldRegion, on page: PDFPage) -> CGRect {
+            let pageBounds = page.bounds(for: .mediaBox)
+            let pageWidth = pageBounds.width
+            let pageHeight = pageBounds.height
+            
+            let normX = region.x
+            let normYTop = region.y
+            let normW = region.width
+            let normH = region.height
+            
+            let width = normW * pageWidth
+            let height = normH * pageHeight
+            let x = normX * pageWidth
+            // Flip Y from top-left to bottom-left
+            let y = pageHeight - (normYTop * pageHeight) - height
+            
+            return CGRect(x: x, y: y, width: width, height: height)
+        }
     }
 }
 
 // MARK: - PDF Annotation Extension
+
 extension PDFAnnotation {
     var fieldName: String? {
         get {
@@ -533,7 +374,6 @@ extension PDFAnnotation {
         set {
             if let newValue = newValue {
                 setValue(newValue as NSString, forAnnotationKey: .widgetValue)
-                // Force appearance stream regeneration
                 clearAppearanceStream()
             } else {
                 removeValue(forAnnotationKey: .widgetValue)
@@ -542,10 +382,8 @@ extension PDFAnnotation {
         }
     }
     
-    /// Clears the appearance stream to force PDFKit to regenerate it
-    /// This is critical for dynamic text rendering in form fields
+    /// Clears appearance dictionary so PDFKit regenerates it on next draw.
     func clearAppearanceStream() {
-        // Remove the appearance dictionary (/AP) so PDFKit recreates it
         removeValue(forAnnotationKey: .appearanceDictionary)
     }
 }
