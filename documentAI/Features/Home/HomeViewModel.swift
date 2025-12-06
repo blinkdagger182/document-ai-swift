@@ -88,7 +88,13 @@ class HomeViewModel: ObservableObject {
             
             // Convert FieldRegionDTO to FieldRegion
             fieldRegions = detail.fieldMap.map { (fieldId, dto) in
-                FieldRegion(
+                // Parse fieldType string to FieldType enum
+                let fieldType: FieldType? = {
+                    guard let typeStr = dto.fieldType else { return nil }
+                    return FieldType(rawValue: typeStr)
+                }()
+                
+                return FieldRegion(
                     id: dto.id,
                     fieldId: fieldId,
                     x: dto.x,
@@ -96,6 +102,7 @@ class HomeViewModel: ObservableObject {
                     width: dto.width,
                     height: dto.height,
                     page: dto.pageIndex,
+                    fieldType: fieldType,
                     source: .ocr
                 )
             }

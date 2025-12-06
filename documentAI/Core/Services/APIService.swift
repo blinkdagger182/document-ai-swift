@@ -306,7 +306,7 @@ struct FieldRegionDTO: Codable {
     let y: Double
     let width: Double
     let height: Double
-    let fieldType: String
+    let fieldType: String?
     let label: String
     let confidence: Double
 }

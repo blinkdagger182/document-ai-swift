@@ -21,6 +21,8 @@
 		FC03BDBA2EDFE96500CA1203 /* Core/Services/LocalFormStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC03BDB62EDFE96500CA1203 /* Core/Services/LocalFormStorageService.swift */; };
 		FC03BDBB2EDFE96500CA1203 /* Features/DocumentEditor/SplitScreenEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC03BDB82EDFE96500CA1203 /* Features/DocumentEditor/SplitScreenEditorView.swift */; };
 		FC03BDBC2EDFE96500CA1203 /* Features/DocumentEditor/DocumentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC03BDB52EDFE96500CA1203 /* Features/DocumentEditor/DocumentViewModel.swift */; };
+		FC797CB82EE2C13D001A4318 /* PDFDocument+AcroForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC797CB72EE2C13D001A4318 /* PDFDocument+AcroForm.swift */; };
+		FC797CBA2EE2C197001A4318 /* QuickLookPDFView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC797CB92EE2C197001A4318 /* QuickLookPDFView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -39,6 +41,8 @@
 		FC03BDB62EDFE96500CA1203 /* Core/Services/LocalFormStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Services/LocalFormStorageService.swift; sourceTree = "<group>"; };
 		FC03BDB72EDFE96500CA1203 /* UI/Components/PDFKitRepresentedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/Components/PDFKitRepresentedView.swift; sourceTree = "<group>"; };
 		FC03BDB82EDFE96500CA1203 /* Features/DocumentEditor/SplitScreenEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/DocumentEditor/SplitScreenEditorView.swift; sourceTree = "<group>"; };
+		FC797CB72EE2C13D001A4318 /* PDFDocument+AcroForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PDFDocument+AcroForm.swift"; sourceTree = "<group>"; };
+		FC797CB92EE2C197001A4318 /* QuickLookPDFView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLookPDFView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -63,6 +67,8 @@
 		E1000002 /* documentAI */ = {
 			isa = PBXGroup;
 			children = (
+				FC797CB92EE2C197001A4318 /* QuickLookPDFView.swift */,
+				FC797CB72EE2C13D001A4318 /* PDFDocument+AcroForm.swift */,
 				FC03BDB52EDFE96500CA1203 /* Features/DocumentEditor/DocumentViewModel.swift */,
 				FC03BDB62EDFE96500CA1203 /* Core/Services/LocalFormStorageService.swift */,
 				FC03BDB72EDFE96500CA1203 /* UI/Components/PDFKitRepresentedView.swift */,
@@ -154,11 +160,13 @@
 			files = (
 				A1000001 /* App/DocumentAIApp.swift in Sources */,
 				A1000002 /* Features/Home/HomeView.swift in Sources */,
+				FC797CB82EE2C13D001A4318 /* PDFDocument+AcroForm.swift in Sources */,
 				A1000004 /* Features/Home/HomeViewModel.swift in Sources */,
 				A1000006 /* Core/Services/DocumentPickerService.swift in Sources */,
 				A1000007 /* Core/Services/ImagePickerService.swift in Sources */,
 				A1000008 /* Core/Services/APIService.swift in Sources */,
 				A1000009 /* Core/Services/LocalStorageService.swift in Sources */,
+				FC797CBA2EE2C197001A4318 /* QuickLookPDFView.swift in Sources */,
 				A1000010 /* UI/Components/AnimatedGradientBackground.swift in Sources */,
 				A1000011 /* Core/Models/Models.swift in Sources */,
 				A1000012 /* UI/Theme/Theme.swift in Sources */,

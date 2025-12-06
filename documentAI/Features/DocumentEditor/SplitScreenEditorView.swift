@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import PDFKit
 
 struct SplitScreenEditorView: View {
     @StateObject private var viewModel: DocumentViewModel
@@ -14,6 +15,11 @@ struct SplitScreenEditorView: View {
     @State private var isDragging = false
     @State private var scrollProxy: ScrollViewProxy?
     @FocusState private var focusedFieldUUID: UUID?
+    
+    // Hybrid pipeline state
+    @State private var showQuickLook = false
+    @State private var showFallbackAlert = false
+    @State private var hasAcroFormFields = false
     
     let onBack: () -> Void
     
@@ -33,6 +39,15 @@ struct SplitScreenEditorView: View {
             pdfURL: pdfURL
         ))
         self.onBack = onBack
+        
+        // Detect AcroForm fields on init
+        if let pdfURL = pdfURL,
+           let document = PDFDocument(url: pdfURL) {
+            _hasAcroFormFields = State(initialValue: document.hasAcroFormFields)
+            if !document.hasAcroFormFields {
+                _showFallbackAlert = State(initialValue: true)
+            }
+        }
     }
     
     var body: some View {
@@ -66,6 +81,30 @@ struct SplitScreenEditorView: View {
         }
         .alert(item: $viewModel.alertState) { alertState in
             createAlert(from: alertState)
+        }
+        .alert("PDF Mode", isPresented: $showFallbackAlert) {
+            Button("Use Synthetic Fields") {
+                // Stay in current view with synthetic widgets
+                showFallbackAlert = false
+            }
+            Button("Open in Files Mode") {
+                showQuickLook = true
+            }
+            Button("Cancel", role: .cancel) {
+                // Stay in current view
+            }
+        } message: {
+            if !viewModel.fieldRegions.isEmpty {
+                Text("This PDF has no native form fields, but we detected \(viewModel.fieldRegions.count) fields using Vision. You can edit them here or use Apple's QuickLook.")
+            } else {
+                Text("This PDF has no interactive fields. Would you like to use Apple's built-in form detector?")
+            }
+        }
+        .fullScreenCover(isPresented: $showQuickLook) {
+            if let pdfURL = viewModel.pdfURL {
+                QuickLookPDFView(url: pdfURL)
+                    .ignoresSafeArea()
+            }
         }
     }
     
@@ -108,16 +147,37 @@ struct SplitScreenEditorView: View {
         GeometryReader { geometry in
             ZStack {
                 if let url = viewModel.pdfURL {
-                    PDFKitRepresentedView(
-                        pdfURL: url,
-                        formValues: $viewModel.formValues,
-                        fieldRegions: viewModel.fieldRegions,
-                        fieldIdToUUID: viewModel.fieldIdToUUID,
-                        onFieldTapped: { uuid in
-                            handleFieldTapped(uuid: uuid)
-                        },
-                        pdfViewSize: geometry.size
-                    )
+                    if hasAcroFormFields || !viewModel.fieldRegions.isEmpty {
+                        // Step 1: Native AcroForm mode OR Step 2: Synthetic widget mode
+                        PDFKitRepresentedView(
+                            pdfURL: url,
+                            formValues: $viewModel.formValues,
+                            fieldRegions: viewModel.fieldRegions,
+                            fieldIdToUUID: viewModel.fieldIdToUUID
+                        )
+                    } else {
+                        // Show message that QuickLook is available
+                        VStack(spacing: 16) {
+                            Image(systemName: "doc.text.magnifyingglass")
+                                .font(.system(size: 60))
+                                .foregroundColor(.gray)
+                            Text("No Interactive Fields Detected")
+                                .font(.headline)
+                                .foregroundColor(.gray)
+                            Text("Tap 'Open in Files Mode' to use Apple's form detector")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            Button("Open in Files Mode") {
+                                showQuickLook = true
+                            }
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                    }
                 }
             }
         }

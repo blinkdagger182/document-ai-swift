@@ -2,8 +2,9 @@
 //  PDFKitRepresentedView.swift
 //  documentAI
 //
-//  Pure native AcroForm editor using PDFKit's interactive form mode
-//  Behaves EXACTLY like iOS Files.app - NO synthetic widgets, NO OCR fallback
+//  Hybrid PDF editor supporting both native AcroForm and synthetic widgets
+//  Step 1: Native AcroForm fields (if present)
+//  Step 2: Synthetic widgets from Vision-detected fieldRegions
 //
 
 import SwiftUI
@@ -14,14 +15,12 @@ struct PDFKitRepresentedView: UIViewRepresentable {
     @Binding var formValues: [UUID: String]
     let fieldRegions: [FieldRegion]
     let fieldIdToUUID: [String: UUID]
-    let onFieldTapped: (UUID) -> Void
-    let pdfViewSize: CGSize
     
     func makeCoordinator() -> Coordinator {
         Coordinator(
             formValues: $formValues,
-            fieldIdToUUID: fieldIdToUUID,
-            onFieldTapped: onFieldTapped
+            fieldRegions: fieldRegions,
+            fieldIdToUUID: fieldIdToUUID
         )
     }
     
@@ -48,11 +47,24 @@ struct PDFKitRepresentedView: UIViewRepresentable {
         
         pdfView.document = document
         context.coordinator.pdfView = pdfView
+        context.coordinator.document = document
         
-        // Detect and map native AcroForm widgets
-        context.coordinator.mapNativeWidgets()
+        // Detect mode: AcroForm vs Synthetic
+        let hasAcroForm = document.hasAcroFormFields
         
-        // Listen for annotation changes (when user edits fields)
+        if hasAcroForm {
+            // Step 1: Native AcroForm mode
+            print("✅ PDF has native AcroForm fields")
+            context.coordinator.mapNativeWidgets()
+        } else if !fieldRegions.isEmpty {
+            // Step 2: Synthetic widget mode
+            print("✅ Creating synthetic widgets from \(fieldRegions.count) field regions")
+            context.coordinator.createSyntheticWidgets()
+        } else {
+            print("⚠️ No AcroForm fields or field regions available")
+        }
+        
+        // Listen for annotation changes
         NotificationCenter.default.addObserver(
             context.coordinator,
             selector: #selector(Coordinator.annotationChanged(_:)),
@@ -66,11 +78,6 @@ struct PDFKitRepresentedView: UIViewRepresentable {
             name: .PDFViewAnnotationWillHit,
             object: pdfView
         )
-        
-        // Sync initial values from SwiftUI to PDF
-        context.coordinator.syncFormValuesToPDF()
-        
-        print("✅ PDFKit interactive form mode enabled")
         
         return pdfView
     }
@@ -88,22 +95,25 @@ struct PDFKitRepresentedView: UIViewRepresentable {
     
     class Coordinator: NSObject {
         @Binding var formValues: [UUID: String]
-        let fieldIdToUUID: [String: UUID]
-        let onFieldTapped: (UUID) -> Void
-        
         weak var pdfView: PDFView?
+        weak var document: PDFDocument?
         
-        // Map fieldName → annotation for native widgets only
-        var widgetMap: [String: PDFAnnotation] = [:]
+        let fieldRegions: [FieldRegion]
+        let fieldIdToUUID: [String: UUID]
+        
+        // Map fieldId → annotation for both native and synthetic widgets
+        var annotationMap: [String: PDFAnnotation] = [:]
+        // Track synthetic annotations for cleanup
+        var syntheticAnnotations: Set<PDFAnnotation> = []
         
         init(
             formValues: Binding<[UUID: String]>,
-            fieldIdToUUID: [String: UUID],
-            onFieldTapped: @escaping (UUID) -> Void
+            fieldRegions: [FieldRegion],
+            fieldIdToUUID: [String: UUID]
         ) {
             self._formValues = formValues
+            self.fieldRegions = fieldRegions
             self.fieldIdToUUID = fieldIdToUUID
-            self.onFieldTapped = onFieldTapped
         }
         
         deinit {
@@ -112,60 +122,150 @@ struct PDFKitRepresentedView: UIViewRepresentable {
         
         // MARK: - Native Widget Detection
         
-        /// Map all native AcroForm widget annotations in the PDF
         func mapNativeWidgets() {
-            guard let pdfView = pdfView,
-                  let document = pdfView.document else { return }
+            guard let document = document else { return }
             
-            widgetMap.removeAll()
+            annotationMap.removeAll()
             
             for pageIndex in 0..<document.pageCount {
                 guard let page = document.page(at: pageIndex) else { continue }
                 
                 for annotation in page.annotations {
-                    // Only process text widget annotations (form fields)
                     if annotation.widgetFieldType == .text,
                        let fieldName = annotation.fieldName {
-                        widgetMap[fieldName] = annotation
-                        print("📋 Found native widget: \(fieldName)")
+                        annotationMap[fieldName] = annotation
+                        
+                        // Initialize formValues with current annotation value if UUID exists
+                        if let uuid = fieldIdToUUID[fieldName] {
+                            let currentValue = annotation.widgetStringValue ?? ""
+                            if !currentValue.isEmpty {
+                                formValues[uuid] = currentValue
+                            }
+                        }
+                        
+                        print("📋 Mapped native widget: \(fieldName)")
                     }
                 }
             }
             
-            if widgetMap.isEmpty {
-                print("⚠️ No native AcroForm widgets found in PDF")
-            } else {
-                print("✅ Mapped \(widgetMap.count) native widgets")
-            }
+            print("✅ Found \(annotationMap.count) native AcroForm fields")
         }
         
-        // MARK: - Sync: SwiftUI → PDF
+        // MARK: - Synthetic Widget Creation
         
-        /// Sync SwiftUI formValues to PDF widget annotations
+        func createSyntheticWidgets() {
+            guard let document = document else { return }
+            
+            annotationMap.removeAll()
+            syntheticAnnotations.removeAll()
+            
+            for region in fieldRegions {
+                // Determine page index (default to 0 if not specified)
+                let pageIndex = region.page ?? 0
+                guard pageIndex < document.pageCount,
+                      let page = document.page(at: pageIndex) else {
+                    print("⚠️ Invalid page index \(pageIndex) for field \(region.fieldId)")
+                    continue
+                }
+                
+                // Convert normalized coordinates to PDF coordinates
+                let bounds = normalizedToPDFRect(
+                    normalized: CGRect(x: region.x, y: region.y, width: region.width, height: region.height),
+                    page: page
+                )
+                
+                // Create synthetic widget annotation
+                let annotation = PDFAnnotation(bounds: bounds, forType: .widget, withProperties: nil)
+                
+                // Configure widget type based on field type
+                let widgetType: PDFAnnotationWidgetSubtype = {
+                    switch region.fieldType {
+                    case .checkbox:
+                        return .button
+                    case .signature:
+                        return .text // Signature fields are text fields in PDF
+                    default:
+                        return .text
+                    }
+                }()
+                
+                annotation.widgetFieldType = widgetType
+                annotation.fieldName = region.fieldId
+                
+                // Style like Files.app
+                annotation.backgroundColor = UIColor.white.withAlphaComponent(0.9)
+                annotation.color = UIColor.black
+                
+                // Configure font for text fields
+                if widgetType == .text {
+                    annotation.font = UIFont.systemFont(ofSize: 12)
+                    annotation.fontColor = UIColor.black
+                }
+                
+                // Add border
+                let border = PDFBorder()
+                border.lineWidth = 1.0
+                border.style = .solid
+                annotation.border = border
+                
+                // Initialize with current form value if exists
+                if let uuid = fieldIdToUUID[region.fieldId],
+                   let value = formValues[uuid], !value.isEmpty {
+                    annotation.widgetStringValue = value
+                }
+                
+                // Add to page
+                page.addAnnotation(annotation)
+                
+                // Track annotation
+                annotationMap[region.fieldId] = annotation
+                syntheticAnnotations.insert(annotation)
+                
+                print("✨ Created synthetic widget: \(region.fieldId) at page \(pageIndex), bounds: \(bounds)")
+            }
+            
+            print("✅ Created \(syntheticAnnotations.count) synthetic widgets")
+            
+            // Force redraw
+            pdfView?.setNeedsDisplay(pdfView?.bounds ?? .zero)
+        }
+        
+        // MARK: - Coordinate Conversion
+        
+        /// Convert normalized coordinates (0-1, bottom-left origin) to PDF coordinates
+        private func normalizedToPDFRect(normalized: CGRect, page: PDFPage) -> CGRect {
+            let pageRect = page.bounds(for: .mediaBox)
+            
+            let px = normalized.origin.x * pageRect.width
+            let py = normalized.origin.y * pageRect.height
+            let pw = normalized.width * pageRect.width
+            let ph = normalized.height * pageRect.height
+            
+            return CGRect(x: px, y: py, width: pw, height: ph)
+        }
+        
+        // MARK: - Sync
+        
         func syncFormValuesToPDF() {
             guard let pdfView = pdfView else { return }
             
-            for (fieldName, annotation) in widgetMap {
-                // Find UUID for this field name
-                guard let uuid = fieldIdToUUID[fieldName] else { continue }
+            for (fieldId, annotation) in annotationMap {
+                guard let uuid = fieldIdToUUID[fieldId] else { continue }
                 
-                // Get new value from SwiftUI state
                 let newValue = formValues[uuid] ?? ""
-                
-                // Get current value from annotation
                 let currentValue = annotation.widgetStringValue ?? ""
                 
-                // Update if changed
                 if newValue != currentValue {
                     annotation.widgetStringValue = newValue
+                    
+                    // Clear appearance stream to force regeneration
+                    annotation.removeValue(forAnnotationKey: .appearanceDictionary)
                     
                     // Trigger redraw
                     if let page = annotation.page {
                         let viewRect = pdfView.convert(annotation.bounds, from: page)
                         pdfView.setNeedsDisplay(viewRect)
                     }
-                    
-                    print("🔄 Synced \(fieldName) = '\(newValue)'")
                 }
             }
         }
@@ -174,13 +274,10 @@ struct PDFKitRepresentedView: UIViewRepresentable {
         
         @objc func annotationWillHit(_ notification: Notification) {
             guard let annotation = notification.userInfo?["PDFAnnotationHit"] as? PDFAnnotation,
-                  let fieldName = annotation.fieldName,
-                  let uuid = fieldIdToUUID[fieldName] else {
+                  let fieldName = annotation.fieldName else {
                 return
             }
-            
-            print("👆 User tapped field: \(fieldName)")
-            onFieldTapped(uuid)
+            print("👆 Annotation will hit: \(fieldName)")
         }
         
         @objc func annotationChanged(_ notification: Notification) {
@@ -190,13 +287,13 @@ struct PDFKitRepresentedView: UIViewRepresentable {
                 return
             }
             
-            // Get the new value from the annotation (user typed in PDFKit's native editor)
             let newValue = annotation.widgetStringValue ?? ""
             
-            // Update SwiftUI state
-            formValues[uuid] = newValue
-            
-            print("✏️ Field \(fieldName) changed to: '\(newValue)'")
+            // Only update if value actually changed
+            if formValues[uuid] != newValue {
+                formValues[uuid] = newValue
+                print("✏️ Field \(fieldName) = '\(newValue)'")
+            }
         }
     }
 }
@@ -204,7 +301,6 @@ struct PDFKitRepresentedView: UIViewRepresentable {
 // MARK: - PDFAnnotation Extension
 
 extension PDFAnnotation {
-    /// Get field name (/T key)
     var fieldName: String? {
         get {
             return value(forAnnotationKey: PDFAnnotationKey(rawValue: "/T")) as? String
@@ -218,7 +314,6 @@ extension PDFAnnotation {
         }
     }
     
-    /// Get/set widget string value (/V key)
     var widgetStringValue: String? {
         get {
             return value(forAnnotationKey: .widgetValue) as? String
@@ -226,7 +321,6 @@ extension PDFAnnotation {
         set {
             if let newValue = newValue {
                 setValue(newValue as NSString, forAnnotationKey: .widgetValue)
-                // Clear appearance stream to force regeneration
                 removeValue(forAnnotationKey: .appearanceDictionary)
             } else {
                 removeValue(forAnnotationKey: .widgetValue)

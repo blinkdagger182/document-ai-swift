@@ -145,6 +145,7 @@ struct FieldRegion: Identifiable, Codable {
     let width: Double
     let height: Double
     let page: Int?
+    let fieldType: FieldType?
     let source: FieldSource
     
     enum FieldSource: String, Codable {
@@ -152,7 +153,7 @@ struct FieldRegion: Identifiable, Codable {
         case ocr = "ocr"            // OCR-detected field
     }
     
-    init(id: String = UUID().uuidString, fieldId: String, x: Double, y: Double, width: Double, height: Double, page: Int?, source: FieldSource = .acroform) {
+    init(id: String = UUID().uuidString, fieldId: String, x: Double, y: Double, width: Double, height: Double, page: Int?, fieldType: FieldType? = nil, source: FieldSource = .acroform) {
         self.id = id
         self.fieldId = fieldId
         self.x = x
@@ -160,6 +161,7 @@ struct FieldRegion: Identifiable, Codable {
         self.width = width
         self.height = height
         self.page = page
+        self.fieldType = fieldType
         self.source = source
     }
     
@@ -179,6 +181,7 @@ struct FieldRegion: Identifiable, Codable {
             width: width,
             height: height,
             page: metadata.page,
+            fieldType: nil,
             source: source
         )
     }
