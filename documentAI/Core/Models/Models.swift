@@ -137,7 +137,7 @@ struct FieldMetadata: Codable {
 }
 
 // MARK: - Field Region (for PDF coordinate mapping)
-struct FieldRegion: Identifiable, Codable {
+struct FieldRegion: Identifiable, Codable, Equatable {
     let id: String
     let fieldId: String
     let x: Double
@@ -191,6 +191,25 @@ struct FieldRegion: Identifiable, Codable {
 typealias FormData = [String: String]
 
 // MARK: - API Response Models
+
+/// Backend response model containing detection results from the hybrid detection pipeline.
+/// Used to determine whether to use native AcroForm mode or synthetic widget mode.
+struct DocumentDetectionResponse: Codable, Equatable {
+    let documentId: String
+    let acroformDetected: Bool
+    let fields: [FieldRegion]
+    let pageCount: Int
+    let status: String
+    
+    enum CodingKeys: String, CodingKey {
+        case documentId = "document_id"
+        case acroformDetected = "acroform_detected"
+        case fields
+        case pageCount = "page_count"
+        case status
+    }
+}
+
 struct ProcessResult: Codable {
     let documentId: String
     let components: [FieldComponent]

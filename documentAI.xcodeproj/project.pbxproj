@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		A1000001 /* App/DocumentAIApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000001 /* App/DocumentAIApp.swift */; };
+		T1000001 /* DocumentDetectionResponseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T1000002 /* DocumentDetectionResponseTests.swift */; };
+		T1000014 /* PDFKitRepresentedViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T1000015 /* PDFKitRepresentedViewTests.swift */; };
+		T1000016 /* IntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T1000017 /* IntegrationTests.swift */; };
 		A1000002 /* Features/Home/HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002 /* Features/Home/HomeView.swift */; };
 		A1000004 /* Features/Home/HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000004 /* Features/Home/HomeViewModel.swift */; };
 		A1000006 /* Core/Services/DocumentPickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000006 /* Core/Services/DocumentPickerService.swift */; };
@@ -43,10 +46,21 @@
 		FC03BDB82EDFE96500CA1203 /* Features/DocumentEditor/SplitScreenEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/DocumentEditor/SplitScreenEditorView.swift; sourceTree = "<group>"; };
 		FC797CB72EE2C13D001A4318 /* PDFDocument+AcroForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PDFDocument+AcroForm.swift"; sourceTree = "<group>"; };
 		FC797CB92EE2C197001A4318 /* QuickLookPDFView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLookPDFView.swift; sourceTree = "<group>"; };
+		T1000002 /* DocumentDetectionResponseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentDetectionResponseTests.swift; sourceTree = "<group>"; };
+		T1000003 /* documentAITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = documentAITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		T1000015 /* PDFKitRepresentedViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFKitRepresentedViewTests.swift; sourceTree = "<group>"; };
+		T1000017 /* IntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		D1000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		T1000004 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -60,8 +74,19 @@
 			isa = PBXGroup;
 			children = (
 				E1000002 /* documentAI */,
+				T1000005 /* documentAITests */,
 				E1000003 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		T1000005 /* documentAITests */ = {
+			isa = PBXGroup;
+			children = (
+				T1000002 /* DocumentDetectionResponseTests.swift */,
+				T1000015 /* PDFKitRepresentedViewTests.swift */,
+				T1000017 /* IntegrationTests.swift */,
+			);
+			path = documentAITests;
 			sourceTree = "<group>";
 		};
 		E1000002 /* documentAI */ = {
@@ -91,6 +116,7 @@
 			isa = PBXGroup;
 			children = (
 				C1000001 /* documentAI.app */,
+				T1000003 /* documentAITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -114,6 +140,24 @@
 			productName = documentAI;
 			productReference = C1000001 /* documentAI.app */;
 			productType = "com.apple.product-type.application";
+		};
+		T1000006 /* documentAITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = T1000007 /* Build configuration list for PBXNativeTarget "documentAITests" */;
+			buildPhases = (
+				T1000008 /* Sources */,
+				T1000004 /* Frameworks */,
+				T1000009 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				T1000010 /* PBXTargetDependency */,
+			);
+			name = documentAITests;
+			productName = documentAITests;
+			productReference = T1000003 /* documentAITests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -139,12 +183,20 @@
 			projectRoot = "";
 			targets = (
 				F1000001 /* documentAI */,
+				T1000006 /* documentAITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		H1000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		T1000009 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -177,7 +229,35 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		T1000008 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				T1000001 /* DocumentDetectionResponseTests.swift in Sources */,
+				T1000014 /* PDFKitRepresentedViewTests.swift in Sources */,
+				T1000016 /* IntegrationTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXContainerItemProxy section */
+		T1000011 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = I1000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F1000001;
+			remoteInfo = documentAI;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		T1000010 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F1000001 /* documentAI */;
+			targetProxy = T1000011 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		J1000001 /* Debug */ = {
@@ -354,6 +434,44 @@
 			};
 			name = Release;
 		};
+		T1000012 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8H5C9P92ZB;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.riskcreatives.documentAITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/documentAI.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/documentAI";
+			};
+			name = Debug;
+		};
+		T1000013 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8H5C9P92ZB;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.riskcreatives.documentAITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/documentAI.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/documentAI";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -371,6 +489,15 @@
 			buildConfigurations = (
 				J1000001 /* Debug */,
 				J1000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		T1000007 /* Build configuration list for PBXNativeTarget "documentAITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				T1000012 /* Debug */,
+				T1000013 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

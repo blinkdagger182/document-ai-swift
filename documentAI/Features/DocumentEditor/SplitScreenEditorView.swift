@@ -148,12 +148,16 @@ struct SplitScreenEditorView: View {
             ZStack {
                 if let url = viewModel.pdfURL {
                     if hasAcroFormFields || !viewModel.fieldRegions.isEmpty {
-                        // Step 1: Native AcroForm mode OR Step 2: Synthetic widget mode
+                        // Mode selection based on hasAcroFormFields flag
                         PDFKitRepresentedView(
                             pdfURL: url,
                             formValues: $viewModel.formValues,
-                            fieldRegions: viewModel.fieldRegions,
-                            fieldIdToUUID: viewModel.fieldIdToUUID
+                            detectedFields: viewModel.fieldRegions,
+                            fieldIdToUUID: viewModel.fieldIdToUUID,
+                            acroformDetected: hasAcroFormFields,
+                            onFieldTapped: { uuid in
+                                handleFieldTapped(uuid: uuid)
+                            }
                         )
                     } else {
                         // Show message that QuickLook is available
