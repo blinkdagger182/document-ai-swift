@@ -21,6 +21,8 @@ struct HomeView: View {
                     documentId: viewModel.documentId,
                     selectedFile: viewModel.selectedFile,
                     pdfURL: viewModel.pdfURL,
+                    commonFormsPdfURL: viewModel.commonFormsPdfURL,
+                    commonFormsFields: viewModel.commonFormsFields,
                     onBack: {
                         viewModel.showResults = false
                     }
@@ -49,6 +51,12 @@ struct HomeView: View {
                     
                     if viewModel.uploading {
                         progressBarSection
+                    }
+                    
+                    // Test CommonForms buttons (only show after document is uploaded)
+                    if !viewModel.documentId.isEmpty {
+                        testCommonFormsButton
+                        testCommonFormsMockButton
                     }
                 }
                 
@@ -258,6 +266,76 @@ struct HomeView: View {
             }
         }
         .frame(height: 8)
+    }
+    
+    // MARK: - Test CommonForms Button
+    private var testCommonFormsButton: some View {
+        Button {
+            Task {
+                await viewModel.testCommonForms()
+            }
+        } label: {
+            HStack(spacing: Theme.Spacing.sm) {
+                if viewModel.commonFormsProcessing {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    Text("Processing CommonForms...")
+                        .font(Theme.Typography.bodySemibold)
+                } else {
+                    Image(systemName: "doc.badge.gearshape")
+                    Text("Test CommonForms")
+                        .font(Theme.Typography.bodySemibold)
+                }
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Theme.Spacing.lg)
+            .background(Color.orange)
+            .cornerRadius(Theme.CornerRadius.md)
+            .shadow(
+                color: Theme.Shadows.button.color,
+                radius: Theme.Shadows.button.radius,
+                x: Theme.Shadows.button.x,
+                y: Theme.Shadows.button.y
+            )
+            .opacity(viewModel.commonFormsProcessing ? 0.6 : 1.0)
+        }
+        .disabled(viewModel.commonFormsProcessing || viewModel.uploading || viewModel.processing)
+    }
+    
+    // MARK: - Test CommonForms Mock Button
+    private var testCommonFormsMockButton: some View {
+        Button {
+            Task {
+                await viewModel.testCommonFormsMock()
+            }
+        } label: {
+            HStack(spacing: Theme.Spacing.sm) {
+                if viewModel.commonFormsProcessing {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    Text("Testing Mock...")
+                        .font(Theme.Typography.bodySemibold)
+                } else {
+                    Image(systemName: "testtube.2")
+                    Text("Test Mock (No CommonForms)")
+                        .font(Theme.Typography.bodySemibold)
+                }
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Theme.Spacing.lg)
+            .background(Color.purple)
+            .cornerRadius(Theme.CornerRadius.md)
+            .shadow(
+                color: Theme.Shadows.button.color,
+                radius: Theme.Shadows.button.radius,
+                x: Theme.Shadows.button.x,
+                y: Theme.Shadows.button.y
+            )
+            .opacity(viewModel.commonFormsProcessing ? 0.6 : 1.0)
+        }
+        .disabled(viewModel.commonFormsProcessing || viewModel.uploading || viewModel.processing)
     }
     
     // MARK: - Features Section

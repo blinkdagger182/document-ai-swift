@@ -268,6 +268,133 @@ class APIService: ObservableObject {
         
         throw APIError.timeout
     }
+    
+    // MARK: - 7. Process with CommonForms
+    /// POST /api/v1/process/commonforms/{documentId}
+    /// Start CommonForms processing to generate fillable PDF
+    func processWithCommonForms(documentId: UUID) async throws -> String {
+        let url = URL(string: "\(baseURL)/api/v1/process/commonforms/\(documentId.uuidString)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            print("❌ CommonForms Error (\(httpResponse.statusCode)): \(errorMessage)")
+            throw APIError.commonFormsFailed
+        }
+        
+        let decoder = JSONDecoder()
+        let cfResponse = try decoder.decode(CommonFormsJobResponse.self, from: data)
+        
+        print("✅ CommonForms job started: \(cfResponse.jobId)")
+        return cfResponse.jobId
+    }
+    
+    // MARK: - 8. Fetch CommonForms Status
+    /// GET /api/v1/process/status/{jobId}
+    /// Poll for CommonForms job status
+    func fetchCommonFormsStatus(jobId: String) async throws -> CommonFormsResult {
+        let url = URL(string: "\(baseURL)/api/v1/process/status/\(jobId)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            print("❌ CommonForms Status Error (\(httpResponse.statusCode)): \(errorMessage)")
+            throw APIError.fetchFailed
+        }
+        
+        let decoder = JSONDecoder()
+        let result = try decoder.decode(CommonFormsResult.self, from: data)
+        
+        print("✅ CommonForms status: \(result.status)")
+        return result
+    }
+    
+    // MARK: - Helper: Poll CommonForms Until Complete
+    /// Poll CommonForms job until completed or failed
+    func pollCommonFormsUntilComplete(jobId: String, maxAttempts: Int = 60) async throws -> CommonFormsResult {
+        for attempt in 1...maxAttempts {
+            let result = try await fetchCommonFormsStatus(jobId: jobId)
+            
+            if result.status == "completed" {
+                return result
+            } else if result.status == "failed" {
+                throw APIError.processingFailed(result.error ?? "CommonForms processing failed")
+            }
+            
+            print("⏳ CommonForms polling \(attempt)/\(maxAttempts): status=\(result.status)")
+            try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+        }
+        
+        throw APIError.timeout
+    }
+    
+    // MARK: - Helper: Download PDF Data
+    /// Download PDF from URL and return local file URL
+    func downloadPDFData(from urlString: String) async throws -> URL {
+        guard let url = URL(string: urlString) else {
+            throw APIError.invalidResponse
+        }
+        
+        let (data, response) = try await URLSession.shared.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.downloadFailed
+        }
+        
+        // Save to temp file
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileName = "commonforms_\(UUID().uuidString).pdf"
+        let localURL = tempDir.appendingPathComponent(fileName)
+        
+        try data.write(to: localURL)
+        print("✅ PDF downloaded to: \(localURL.path)")
+        
+        return localURL
+    }
+    
+    // MARK: - 9. Process with CommonForms (Mock)
+    /// POST /api/v1/process/commonforms/{documentId}/mock
+    /// Mock CommonForms processing for testing - returns immediately with fake fields
+    func processWithCommonFormsMock(documentId: UUID) async throws -> CommonFormsResult {
+        let url = URL(string: "\(baseURL)/api/v1/process/commonforms/\(documentId.uuidString)/mock")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            print("❌ CommonForms Mock Error (\(httpResponse.statusCode)): \(errorMessage)")
+            throw APIError.commonFormsFailed
+        }
+        
+        let decoder = JSONDecoder()
+        let result = try decoder.decode(CommonFormsResult.self, from: data)
+        
+        print("✅ CommonForms mock completed: \(result.fields?.count ?? 0) fields")
+        return result
+    }
 }
 
 // MARK: - API Response Models
@@ -331,6 +458,28 @@ struct DownloadResponse: Codable {
     let filledPdfUrl: String
 }
 
+// MARK: - CommonForms Response Models
+
+struct CommonFormsJobResponse: Codable {
+    let jobId: String
+}
+
+struct CommonFormsResult: Codable {
+    let status: String
+    let outputPdfUrl: String?
+    let fields: [DetectedField]?
+    let documentId: String?
+    let error: String?
+}
+
+struct DetectedField: Codable {
+    let id: String
+    let type: String
+    let page: Int
+    let bbox: [Double]
+    let label: String?
+}
+
 // MARK: - API Errors
 enum APIError: LocalizedError {
     case uploadFailed
@@ -339,6 +488,7 @@ enum APIError: LocalizedError {
     case submitFailed
     case composeFailed
     case downloadFailed
+    case commonFormsFailed
     case processingFailed(String)
     case invalidResponse
     case timeout
@@ -357,6 +507,8 @@ enum APIError: LocalizedError {
             return "Failed to start PDF composition"
         case .downloadFailed:
             return "Failed to get download URL"
+        case .commonFormsFailed:
+            return "Failed to start CommonForms processing"
         case .processingFailed(let message):
             return "Processing failed: \(message)"
         case .invalidResponse:

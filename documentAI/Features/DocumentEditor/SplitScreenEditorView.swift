@@ -21,6 +21,10 @@ struct SplitScreenEditorView: View {
     @State private var showFallbackAlert = false
     @State private var hasAcroFormFields = false
     
+    // CommonForms backend-generated PDF
+    @State private var commonFormsPdfURL: URL?
+    @State private var commonFormsFields: [DetectedField] = []
+    
     let onBack: () -> Void
     
     init(
@@ -29,6 +33,8 @@ struct SplitScreenEditorView: View {
         documentId: String,
         selectedFile: DocumentModel?,
         pdfURL: URL?,
+        commonFormsPdfURL: URL? = nil,
+        commonFormsFields: [DetectedField] = [],
         onBack: @escaping () -> Void
     ) {
         _viewModel = StateObject(wrappedValue: DocumentViewModel(
@@ -39,14 +45,35 @@ struct SplitScreenEditorView: View {
             pdfURL: pdfURL
         ))
         self.onBack = onBack
+        self._commonFormsPdfURL = State(initialValue: commonFormsPdfURL)
+        self._commonFormsFields = State(initialValue: commonFormsFields)
         
-        // Detect AcroForm fields on init
-        if let pdfURL = pdfURL,
-           let document = PDFDocument(url: pdfURL) {
+        // Use CommonForms PDF if available, otherwise detect AcroForm fields
+        let effectivePdfURL = commonFormsPdfURL ?? pdfURL
+        if let effectivePdfURL = effectivePdfURL,
+           let document = PDFDocument(url: effectivePdfURL) {
             _hasAcroFormFields = State(initialValue: document.hasAcroFormFields)
-            if !document.hasAcroFormFields {
+            if !document.hasAcroFormFields && commonFormsPdfURL == nil {
                 _showFallbackAlert = State(initialValue: true)
             }
+        }
+        
+        // Log CommonForms fields if provided
+        if !commonFormsFields.isEmpty {
+            print("📝 ===== COMMONFORMS FIELDS IN EDITOR =====")
+            for (index, field) in commonFormsFields.enumerated() {
+                print("  [\(index)] id: \(field.id)")
+                print("       type: \(field.type)")
+                print("       page: \(field.page)")
+                print("       bbox: \(field.bbox)")
+                print("       label: \(field.label ?? "nil")")
+            }
+            print("📝 ===== TOTAL: \(commonFormsFields.count) FIELDS =====")
+        }
+        
+        // Log CommonForms PDF URL if provided
+        if let cfUrl = commonFormsPdfURL {
+            print("📄 CommonForms PDF URL: \(cfUrl.path)")
         }
     }
     
@@ -146,19 +173,27 @@ struct SplitScreenEditorView: View {
     private func pdfViewerPane(height: CGFloat) -> some View {
         GeometryReader { geometry in
             ZStack {
-                if let url = viewModel.pdfURL {
-                    if hasAcroFormFields || !viewModel.fieldRegions.isEmpty {
-                        // Mode selection based on hasAcroFormFields flag
+                // Prefer CommonForms PDF if available
+                let effectiveURL = commonFormsPdfURL ?? viewModel.pdfURL
+                
+                if let url = effectiveURL {
+                    if hasAcroFormFields || !viewModel.fieldRegions.isEmpty || commonFormsPdfURL != nil {
+                        // Mode selection based on hasAcroFormFields flag or CommonForms PDF
                         PDFKitRepresentedView(
                             pdfURL: url,
                             formValues: $viewModel.formValues,
                             detectedFields: viewModel.fieldRegions,
                             fieldIdToUUID: viewModel.fieldIdToUUID,
-                            acroformDetected: hasAcroFormFields,
+                            acroformDetected: hasAcroFormFields || commonFormsPdfURL != nil,
                             onFieldTapped: { uuid in
                                 handleFieldTapped(uuid: uuid)
                             }
                         )
+                        .onAppear {
+                            if commonFormsPdfURL != nil {
+                                print("📄 Loading CommonForms-generated fillable PDF")
+                            }
+                        }
                     } else {
                         // Show message that QuickLook is available
                         VStack(spacing: 16) {
