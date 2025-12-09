@@ -238,29 +238,25 @@ class HomeViewModel: ObservableObject {
             // Step 4: Download fillable PDF and assign to state
             if let pdfUrlString = result.outputPdfUrl {
                 print("📥 Downloading fillable PDF from: \(pdfUrlString)")
-                do {
-                    let localPdfURL = try await apiService.downloadPDFData(from: pdfUrlString)
+                let localPdfURL = try await apiService.downloadPDFData(from: pdfUrlString)
+                
+                // Verify file exists
+                if FileManager.default.fileExists(atPath: localPdfURL.path) {
+                    print("✅ PDF file verified at: \(localPdfURL.path)")
                     
-                    // Verify file exists
-                    if FileManager.default.fileExists(atPath: localPdfURL.path) {
-                        print("✅ PDF file verified at: \(localPdfURL.path)")
-                        
-                        // Assign CommonForms PDF URL (this is the key assignment)
-                        self.commonFormsPdfURL = localPdfURL
-                        self.pdfURL = localPdfURL
-                        
-                        print("✅ pdfURL assigned: \(self.pdfURL?.path ?? "nil")")
-                        print("✅ commonFormsPdfURL assigned: \(self.commonFormsPdfURL?.path ?? "nil")")
-                    } else {
-                        print("❌ PDF file does not exist at path: \(localPdfURL.path)")
-                        throw APIError.downloadFailed
-                    }
-                } catch {
-                    print("❌ Failed to download PDF: \(error)")
-                    throw error
+                    // Assign CommonForms PDF URL
+                    self.commonFormsPdfURL = localPdfURL
+                    self.pdfURL = localPdfURL
+                    
+                    print("✅ pdfURL assigned: \(self.pdfURL?.path ?? "nil")")
+                    print("✅ commonFormsPdfURL assigned: \(self.commonFormsPdfURL?.path ?? "nil")")
+                } else {
+                    print("❌ PDF file does not exist at path: \(localPdfURL.path)")
+                    throw APIError.downloadFailed
                 }
             } else {
                 print("⚠️ No outputPdfUrl in CommonForms result")
+                throw APIError.invalidResponse
             }
             
             // Assign CommonForms fields
