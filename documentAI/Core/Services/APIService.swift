@@ -346,14 +346,29 @@ class APIService: ObservableObject {
     // MARK: - Helper: Download PDF Data
     /// Download PDF from URL and return local file URL
     func downloadPDFData(from urlString: String) async throws -> URL {
+        print("🔗 Attempting to download PDF from: \(urlString)")
+        
         guard let url = URL(string: urlString) else {
+            print("❌ Invalid URL string: \(urlString)")
             throw APIError.invalidResponse
         }
         
+        print("📡 Starting URLSession download...")
         let (data, response) = try await URLSession.shared.data(from: url)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ Response is not HTTPURLResponse")
+            throw APIError.downloadFailed
+        }
+        
+        print("📊 HTTP Status Code: \(httpResponse.statusCode)")
+        print("📦 Downloaded data size: \(data.count) bytes")
+        
+        guard httpResponse.statusCode == 200 else {
+            print("❌ HTTP error: \(httpResponse.statusCode)")
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("❌ Response body: \(responseString)")
+            }
             throw APIError.downloadFailed
         }
         
@@ -362,8 +377,12 @@ class APIService: ObservableObject {
         let fileName = "commonforms_\(UUID().uuidString).pdf"
         let localURL = tempDir.appendingPathComponent(fileName)
         
+        print("💾 Writing PDF to: \(localURL.path)")
         try data.write(to: localURL)
-        print("✅ PDF downloaded to: \(localURL.path)")
+        
+        // Verify file was written
+        let fileSize = try FileManager.default.attributesOfItem(atPath: localURL.path)[.size] as? Int ?? 0
+        print("✅ PDF saved successfully: \(fileSize) bytes at \(localURL.path)")
         
         return localURL
     }

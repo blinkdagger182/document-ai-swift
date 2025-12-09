@@ -37,19 +37,21 @@ struct SplitScreenEditorView: View {
         commonFormsFields: [DetectedField] = [],
         onBack: @escaping () -> Void
     ) {
+        // Use CommonForms PDF if available, otherwise use regular PDF
+        let effectivePdfURL = commonFormsPdfURL ?? pdfURL
+        
         _viewModel = StateObject(wrappedValue: DocumentViewModel(
             components: components,
             fieldRegions: fieldRegions,
             documentId: documentId,
             selectedFile: selectedFile,
-            pdfURL: pdfURL
+            pdfURL: effectivePdfURL  // <-- Use the effective PDF URL
         ))
         self.onBack = onBack
         self._commonFormsPdfURL = State(initialValue: commonFormsPdfURL)
         self._commonFormsFields = State(initialValue: commonFormsFields)
         
-        // Use CommonForms PDF if available, otherwise detect AcroForm fields
-        let effectivePdfURL = commonFormsPdfURL ?? pdfURL
+        // Detect AcroForm fields from the effective PDF
         if let effectivePdfURL = effectivePdfURL,
            let document = PDFDocument(url: effectivePdfURL) {
             _hasAcroFormFields = State(initialValue: document.hasAcroFormFields)
@@ -75,6 +77,11 @@ struct SplitScreenEditorView: View {
         if let cfUrl = commonFormsPdfURL {
             print("📄 CommonForms PDF URL: \(cfUrl.path)")
         }
+        
+        // Log all PDF URLs for debugging
+        print("🔍 SplitScreenEditorView init:")
+        print("   pdfURL: \(pdfURL?.path ?? "nil")")
+        print("   commonFormsPdfURL: \(commonFormsPdfURL?.path ?? "nil")")
     }
     
     var body: some View {
