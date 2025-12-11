@@ -17,9 +17,7 @@ struct HomeView: View {
                 .ignoresSafeArea()
             
             if viewModel.showResults {
-                SplitScreenEditorView(
-                    components: [],
-                    fieldRegions: [],
+                DocumentChatView(
                     documentId: viewModel.documentId,
                     selectedFile: viewModel.selectedFile,
                     pdfURL: viewModel.pdfURL,
@@ -106,11 +104,32 @@ struct HomeView: View {
                 }
             }
             
-            HStack {
-                actionButton(icon: "cloud", text: "Import from Drive") {
-                    // TODO: Implement Drive import
+            // Show selected file
+            if let file = viewModel.selectedFile {
+                HStack {
+                    Image(systemName: "doc.fill")
+                        .foregroundColor(.purple)
+                    Text(file.name)
+                        .font(.system(size: 14))
+                        .foregroundColor(.black)
+                        .lineLimit(1)
+                    Spacer()
+                    Button {
+                        viewModel.reset()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.gray)
+                    }
                 }
-                Spacer()
+                .padding()
+                .background(Color.white)
+                .cornerRadius(12)
+                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+            }
+            
+            // Upload button
+            if viewModel.selectedFile != nil {
+                uploadButton
             }
         }
     }
@@ -130,6 +149,38 @@ struct HomeView: View {
             .cornerRadius(12)
             .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
         }
+    }
+    
+    // MARK: - Upload Button
+    private var uploadButton: some View {
+        Button {
+            Task {
+                await viewModel.uploadAndProcess()
+            }
+        } label: {
+            HStack {
+                if viewModel.uploading || viewModel.processing {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    Text(viewModel.uploading ? "Uploading..." : "Processing...")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                } else {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 20))
+                    Text("Upload & Process")
+                        .font(.system(size: 16, weight: .semibold))
+                }
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(Color.purple)
+            .cornerRadius(12)
+            .shadow(color: .purple.opacity(0.3), radius: 8, x: 0, y: 4)
+        }
+        .disabled(viewModel.selectedFile == nil || viewModel.uploading || viewModel.processing)
+        .opacity(viewModel.selectedFile == nil ? 0.6 : 1.0)
     }
     
     // MARK: - Recent Documents Section
@@ -246,58 +297,24 @@ struct HomeView: View {
     
     // MARK: - Chat Input Section
     private var chatInputSection: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 16) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 20))
-                    .foregroundColor(.purple)
-                
-                TextField("Ask documentAI anything", text: $chatMessage)
-                    .font(.system(size: 16))
-                    .foregroundColor(.black)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 24)
-                    .fill(Color.white)
-                    .shadow(color: .black.opacity(0.1), radius: 12, x: 0, y: -4)
-            )
-            .padding(.horizontal, 20)
-            .padding(.bottom, 12)
+        HStack(spacing: 16) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 20))
+                .foregroundColor(.purple)
             
-            // Bottom Navigation Bar
-            HStack(spacing: 0) {
-                Spacer()
-                
-                Button(action: {}) {
-                    Image(systemName: "message.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(.blue)
-                }
-                
-                Spacer()
-                
-                Button(action: {}) {
-                    Image(systemName: "person.circle")
-                        .font(.system(size: 24))
-                        .foregroundColor(.black.opacity(0.6))
-                }
-                
-                Spacer()
-                
-                Button(action: {}) {
-                    Image(systemName: "person.2")
-                        .font(.system(size: 24))
-                        .foregroundColor(.black.opacity(0.6))
-                }
-                
-                Spacer()
-            }
-            .padding(.vertical, 12)
-            .background(Color.white)
+            TextField("Ask documentAI anything", text: $chatMessage)
+                .font(.system(size: 16))
+                .foregroundColor(.black)
         }
-        .background(Color.white)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.1), radius: 12, x: 0, y: -4)
+        )
+        .padding(.horizontal, 20)
+        .padding(.bottom, 12)
     }
 }
 
