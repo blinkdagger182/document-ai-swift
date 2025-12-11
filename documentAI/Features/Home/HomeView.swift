@@ -9,15 +9,17 @@ import SwiftUI
 
 struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
+    @State private var chatMessage = ""
     
     var body: some View {
         ZStack {
             AnimatedGradientBackground()
+                .ignoresSafeArea()
             
             if viewModel.showResults {
                 SplitScreenEditorView(
-                    components: viewModel.components,
-                    fieldRegions: viewModel.fieldRegions,
+                    components: [],
+                    fieldRegions: [],
                     documentId: viewModel.documentId,
                     selectedFile: viewModel.selectedFile,
                     pdfURL: viewModel.pdfURL,
@@ -41,332 +43,261 @@ struct HomeView: View {
     }
     
     private var homeContent: some View {
-        ScrollView {
-            VStack(spacing: Theme.Spacing.xxl) {
-                headerSection
-                uploadBoxSection
-                
-                if viewModel.selectedFile != nil {
-                    uploadButtonSection
-                    
-                    if viewModel.uploading {
-                        progressBarSection
-                    }
-                    
-                    // Test CommonForms buttons (only show after document is uploaded)
-                    if !viewModel.documentId.isEmpty {
-                        testCommonFormsButton
-                        testCommonFormsMockButton
-                    }
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    greetingHeader
+                    documentActionsSection
+                    recentDocumentsSection
+                    aiPromptSuggestions
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 100)
+            }
+            
+            Spacer()
+            
+            chatInputSection
+        }
+    }
+    
+    // MARK: - Greeting Header
+    private var greetingHeader: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Good evening, Azhan")
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundColor(.black.opacity(0.7))
                 
-                featuresSection
+                Text("Your documents")
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundColor(.black)
             }
-            .padding(Theme.Spacing.xl)
-            .padding(.top, Theme.Spacing.xxxl)
-        }
-    }
-    
-    // MARK: - Header Section
-    private var headerSection: some View {
-        VStack(spacing: Theme.Spacing.lg) {
-            Image(systemName: "doc.text.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 100, height: 100)
-                .foregroundColor(Theme.Colors.primary)
             
-            Text("documentAI")
-                .font(Theme.Typography.largeTitle)
-                .foregroundColor(Theme.Colors.textPrimary)
+            Spacer()
             
-            Text("Upload & Process Documents with AI")
-                .font(Theme.Typography.body)
-                .foregroundColor(Theme.Colors.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-    }
-    
-    // MARK: - Upload Box Section
-    private var uploadBoxSection: some View {
-        VStack(spacing: Theme.Spacing.xl) {
-            if let file = viewModel.selectedFile {
-                fileInfoView(file: file)
-            } else {
-                emptyUploadView
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(Theme.Spacing.xxxl)
-        .background(Theme.Colors.cardBackground.opacity(0.95))
-        .cornerRadius(Theme.CornerRadius.xxl)
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.CornerRadius.xxl)
-                .stroke(
-                    style: StrokeStyle(
-                        lineWidth: 2,
-                        dash: [10, 5]
-                    )
+            Circle()
+                .fill(Color.purple)
+                .frame(width: 44, height: 44)
+                .overlay(
+                    Text("A")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
                 )
-                .foregroundColor(Theme.Colors.primary)
-        )
-        .shadow(
-            color: Theme.Shadows.card.color,
-            radius: Theme.Shadows.card.radius,
-            x: Theme.Shadows.card.x,
-            y: Theme.Shadows.card.y
-        )
+        }
+        .padding(.top, 8)
     }
     
-    // MARK: - Empty Upload View
-    private var emptyUploadView: some View {
-        VStack(spacing: Theme.Spacing.xl) {
-            Image(systemName: "icloud.and.arrow.up")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 80, height: 80)
-                .foregroundColor(Theme.Colors.primary)
-            
-            Text("Upload Your Document")
-                .font(Theme.Typography.title)
-                .foregroundColor(Theme.Colors.textPrimary)
-            
-            Text("PDF, Images, or Scanned Documents")
-                .font(Theme.Typography.caption)
-                .foregroundColor(Theme.Colors.textSecondary)
-            
-            HStack(spacing: Theme.Spacing.md) {
-                Button {
-                    Task {
-                        await viewModel.pickDocument()
-                    }
-                } label: {
-                    HStack(spacing: Theme.Spacing.sm) {
-                        Image(systemName: "doc")
-                        Text("Document")
-                    }
-                    .font(Theme.Typography.bodySemibold)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, Theme.Spacing.xl)
-                    .padding(.vertical, Theme.Spacing.md)
-                    .background(Theme.Colors.primary)
-                    .cornerRadius(Theme.CornerRadius.md)
-                }
-                
-                Button {
+    // MARK: - Document Actions Section
+    private var documentActionsSection: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                actionButton(icon: "plus", text: "Scan PDF") {
                     Task {
                         await viewModel.pickImage()
                     }
-                } label: {
-                    HStack(spacing: Theme.Spacing.sm) {
-                        Image(systemName: "photo")
-                        Text("Image")
-                    }
-                    .font(Theme.Typography.bodySemibold)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, Theme.Spacing.xl)
-                    .padding(.vertical, Theme.Spacing.md)
-                    .background(Theme.Colors.secondary)
-                    .cornerRadius(Theme.CornerRadius.md)
                 }
+                
+                actionButton(icon: "folder", text: "Upload from Files") {
+                    Task {
+                        await viewModel.pickDocument()
+                    }
+                }
+            }
+            
+            HStack {
+                actionButton(icon: "cloud", text: "Import from Drive") {
+                    // TODO: Implement Drive import
+                }
+                Spacer()
             }
         }
     }
     
-    // MARK: - File Info View
-    private func fileInfoView(file: DocumentModel) -> some View {
-        VStack(spacing: Theme.Spacing.lg) {
-            Image(systemName: file.isPDF ? "doc.fill" : "photo.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 64, height: 64)
-                .foregroundColor(Theme.Colors.primary)
+    private func actionButton(icon: String, text: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                Text(text)
+                    .font(.system(size: 16, weight: .medium))
+            }
+            .foregroundColor(.black)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .background(Color.white)
+            .cornerRadius(12)
+            .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+        }
+    }
+    
+    // MARK: - Recent Documents Section
+    private var recentDocumentsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Recent documents")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(.black)
             
-            Text(file.name)
-                .font(Theme.Typography.bodySemibold)
-                .foregroundColor(Theme.Colors.textPrimary)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .padding(.horizontal, Theme.Spacing.xl)
-            
-            Text("\(file.sizeInKB) KB")
-                .font(Theme.Typography.caption)
-                .foregroundColor(Theme.Colors.textSecondary)
-            
-            Button {
-                Task {
-                    await viewModel.pickDocument()
-                }
-            } label: {
-                HStack(spacing: Theme.Spacing.sm) {
-                    Image(systemName: "arrow.left.arrow.right")
-                    Text("Change")
-                }
-                .font(Theme.Typography.captionMedium)
-                .foregroundColor(Theme.Colors.textSecondary)
-                .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.vertical, Theme.Spacing.sm)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                        .stroke(Theme.Colors.border, lineWidth: 1)
+            VStack(spacing: 12) {
+                documentRow(
+                    title: "W-4 Form",
+                    time: "5 minutes ago",
+                    pages: "1 pages",
+                    tag: "Forms",
+                    hasCheckmark: true
+                )
+                
+                documentRow(
+                    title: "Rent Invoice – January",
+                    time: "1 hour ago",
+                    pages: "1 pages",
+                    tag: "Invoice",
+                    hasCheckmark: false
+                )
+                
+                documentRow(
+                    title: "NDA – Project X",
+                    time: "3 hours ago",
+                    pages: "3 pages",
+                    tag: "Contract",
+                    hasCheckmark: false
+                )
+                
+                documentRow(
+                    title: "Employment Contract – ACME",
+                    time: "1 day ago",
+                    pages: "12 pages",
+                    tag: "AI",
+                    hasCheckmark: true
                 )
             }
-            .disabled(viewModel.uploading || viewModel.processing)
         }
     }
     
-    // MARK: - Upload Button Section
-    private var uploadButtonSection: some View {
-        Button {
-            Task {
-                await viewModel.uploadAndProcess()
-            }
-        } label: {
-            HStack(spacing: Theme.Spacing.sm) {
-                if viewModel.uploading || viewModel.processing {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    Text(viewModel.uploading ? "Uploading \(Int(viewModel.progress))%" : "Processing...")
-                        .font(Theme.Typography.bodySemibold)
-                } else {
-                    Image(systemName: "icloud.and.arrow.up")
-                    Text("Upload & Process")
-                        .font(Theme.Typography.bodySemibold)
-                }
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Theme.Spacing.lg)
-            .background(Theme.Colors.primary)
-            .cornerRadius(Theme.CornerRadius.md)
-            .shadow(
-                color: Theme.Shadows.button.color,
-                radius: Theme.Shadows.button.radius,
-                x: Theme.Shadows.button.x,
-                y: Theme.Shadows.button.y
-            )
-            .opacity((viewModel.uploading || viewModel.processing) ? 0.6 : 1.0)
-        }
-        .disabled(viewModel.uploading || viewModel.processing)
-    }
-    
-    // MARK: - Progress Bar Section
-    private var progressBarSection: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                Rectangle()
-                    .fill(Theme.Colors.progressTrack)
-                    .frame(height: 8)
-                    .cornerRadius(4)
+    private func documentRow(title: String, time: String, pages: String, tag: String, hasCheckmark: Bool) -> some View {
+        HStack(spacing: 12) {
+            ZStack(alignment: .bottomTrailing) {
+                Image(systemName: "doc.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(.red)
                 
-                Rectangle()
-                    .fill(Theme.Colors.primary)
-                    .frame(width: geometry.size.width * (viewModel.progress / 100), height: 8)
-                    .cornerRadius(4)
-            }
-        }
-        .frame(height: 8)
-    }
-    
-    // MARK: - Test CommonForms Button
-    private var testCommonFormsButton: some View {
-        Button {
-            Task {
-                await viewModel.testCommonForms()
-            }
-        } label: {
-            HStack(spacing: Theme.Spacing.sm) {
-                if viewModel.commonFormsProcessing {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    Text("Processing CommonForms...")
-                        .font(Theme.Typography.bodySemibold)
-                } else {
-                    Image(systemName: "doc.badge.gearshape")
-                    Text("Test CommonForms")
-                        .font(Theme.Typography.bodySemibold)
+                if hasCheckmark {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 18, height: 18)
+                        .overlay(
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                        .offset(x: 4, y: 4)
                 }
             }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Theme.Spacing.lg)
-            .background(Color.orange)
-            .cornerRadius(Theme.CornerRadius.md)
-            .shadow(
-                color: Theme.Shadows.button.color,
-                radius: Theme.Shadows.button.radius,
-                x: Theme.Shadows.button.x,
-                y: Theme.Shadows.button.y
-            )
-            .opacity(viewModel.commonFormsProcessing ? 0.6 : 1.0)
+            .frame(width: 40)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.black)
+                
+                Text("\(time) · \(pages)")
+                    .font(.system(size: 14))
+                    .foregroundColor(.black.opacity(0.5))
+            }
+            
+            Spacer()
+            
+            Text(tag)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.black.opacity(0.7))
         }
-        .disabled(viewModel.commonFormsProcessing || viewModel.uploading || viewModel.processing)
+        .padding(.vertical, 4)
     }
     
-    // MARK: - Test CommonForms Mock Button
-    private var testCommonFormsMockButton: some View {
-        Button {
-            Task {
-                await viewModel.testCommonFormsMock()
+    // MARK: - AI Prompt Suggestions
+    private var aiPromptSuggestions: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                promptChip(text: "Summarize all unread")
+                promptChip(text: "Find documents")
             }
-        } label: {
-            HStack(spacing: Theme.Spacing.sm) {
-                if viewModel.commonFormsProcessing {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    Text("Testing Mock...")
-                        .font(Theme.Typography.bodySemibold)
-                } else {
-                    Image(systemName: "testtube.2")
-                    Text("Test Mock (No CommonForms)")
-                        .font(Theme.Typography.bodySemibold)
+            
+            HStack(spacing: 12) {
+                promptChip(text: "due this week")
+                promptChip(text: "Show forms I need to sign")
+            }
+        }
+        .padding(.top, 8)
+    }
+    
+    private func promptChip(text: String) -> some View {
+        Text(text)
+            .font(.system(size: 15, weight: .medium))
+            .foregroundColor(.black.opacity(0.8))
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white.opacity(0.9))
+                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+            )
+    }
+    
+    // MARK: - Chat Input Section
+    private var chatInputSection: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 16) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 20))
+                    .foregroundColor(.purple)
+                
+                TextField("Ask documentAI anything", text: $chatMessage)
+                    .font(.system(size: 16))
+                    .foregroundColor(.black)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.white)
+                    .shadow(color: .black.opacity(0.1), radius: 12, x: 0, y: -4)
+            )
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
+            
+            // Bottom Navigation Bar
+            HStack(spacing: 0) {
+                Spacer()
+                
+                Button(action: {}) {
+                    Image(systemName: "message.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.blue)
                 }
+                
+                Spacer()
+                
+                Button(action: {}) {
+                    Image(systemName: "person.circle")
+                        .font(.system(size: 24))
+                        .foregroundColor(.black.opacity(0.6))
+                }
+                
+                Spacer()
+                
+                Button(action: {}) {
+                    Image(systemName: "person.2")
+                        .font(.system(size: 24))
+                        .foregroundColor(.black.opacity(0.6))
+                }
+                
+                Spacer()
             }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Theme.Spacing.lg)
-            .background(Color.purple)
-            .cornerRadius(Theme.CornerRadius.md)
-            .shadow(
-                color: Theme.Shadows.button.color,
-                radius: Theme.Shadows.button.radius,
-                x: Theme.Shadows.button.x,
-                y: Theme.Shadows.button.y
-            )
-            .opacity(viewModel.commonFormsProcessing ? 0.6 : 1.0)
+            .padding(.vertical, 12)
+            .background(Color.white)
         }
-        .disabled(viewModel.commonFormsProcessing || viewModel.uploading || viewModel.processing)
-    }
-    
-    // MARK: - Features Section
-    private var featuresSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-            Text("Features")
-                .font(Theme.Typography.title2)
-                .foregroundColor(Theme.Colors.textPrimary)
-            
-            featureRow(icon: "scanner", text: "Multi-page scanning")
-            featureRow(icon: "chart.bar", text: "AI-powered extraction")
-            featureRow(icon: "pencil", text: "Editable forms")
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Theme.Spacing.xl)
-        .background(Theme.Colors.cardBackground.opacity(0.9))
-        .cornerRadius(Theme.CornerRadius.lg)
-    }
-    
-    private func featureRow(icon: String, text: String) -> some View {
-        HStack(spacing: Theme.Spacing.md) {
-            Image(systemName: icon)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 24, height: 24)
-                .foregroundColor(Theme.Colors.primary)
-            
-            Text(text)
-                .font(Theme.Typography.body)
-                .foregroundColor(Theme.Colors.textSecondary)
-        }
+        .background(Color.white)
     }
 }
 

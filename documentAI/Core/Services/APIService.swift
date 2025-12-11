@@ -387,33 +387,7 @@ class APIService: ObservableObject {
         return localURL
     }
     
-    // MARK: - 9. Process with CommonForms (Mock)
-    /// POST /api/v1/process/commonforms/{documentId}/mock
-    /// Mock CommonForms processing for testing - returns immediately with fake fields
-    func processWithCommonFormsMock(documentId: UUID) async throws -> CommonFormsResult {
-        let url = URL(string: "\(baseURL)/api/v1/process/commonforms/\(documentId.uuidString)/mock")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
-            print("❌ CommonForms Mock Error (\(httpResponse.statusCode)): \(errorMessage)")
-            throw APIError.commonFormsFailed
-        }
-        
-        let decoder = JSONDecoder()
-        let result = try decoder.decode(CommonFormsResult.self, from: data)
-        
-        print("✅ CommonForms mock completed: \(result.fields?.count ?? 0) fields")
-        return result
-    }
+
 }
 
 // MARK: - API Response Models
