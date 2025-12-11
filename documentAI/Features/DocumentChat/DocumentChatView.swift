@@ -119,13 +119,30 @@ struct DocumentChatView: View {
                                 detectedFields: commonFormsFields,
                                 currentPage: $currentPDFPage,
                                 isZoomedIn: $isZoomedIn,
+                                onFieldTapped: { field in
+                                    // Field was tapped - expand drawer and send message to AI
+                                    print("🎯 Field tapped: \(field.label ?? field.id)")
+                                    let screenHeight = UIScreen.main.bounds.height
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                        drawerHeight = screenHeight * 0.5
+                                    }
+                                    
+                                    // Optionally send a message to AI about this field
+                                    if let label = field.label {
+                                        chatViewModel.inputMessage = "Help me fill: \(label)"
+                                    }
+                                },
                                 onTap: {
-                                    // Minimize drawer when PDF is tapped
+                                    // Minimize drawer when PDF background is tapped
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                                         drawerHeight = 120
                                     }
                                 }
                             )
+                            .onAppear {
+                                print("🎨 AnnotatedPDFView appeared with \(commonFormsFields.count) fields")
+                                print("📄 PDF URL: \(commonFormsPdfURL?.lastPathComponent ?? "nil")")
+                            }
                         } else {
                             // Use regular PDF view
                             PDFViewWrapper(
@@ -178,12 +195,12 @@ struct DocumentChatView: View {
     func zoomOutPDF() {
         NotificationCenter.default.post(name: NSNotification.Name("ZoomOutPDF"), object: nil)
     }
-    
+
     func pdfToolbar(pageCount: Int) -> some View {
         HStack(spacing: 8) {
-            // Back button
+            // Back button (to home screen)
             Button {
-                onBack()
+                // Navigate back to home
             } label: {
                 Image(systemName: "arrow.left")
                     .font(.system(size: 20))
@@ -193,9 +210,37 @@ struct DocumentChatView: View {
                     .cornerRadius(12)
             }
             
+            // Add menu button
+            Menu {
+                Button {
+                    // Add text field
+                } label: {
+                    Label("Add Text Field", systemImage: "textformat")
+                }
+                
+                Button {
+                    // Add toggle/checkbox
+                } label: {
+                    Label("Add Toggle/Checkbox", systemImage: "checkmark.square")
+                }
+                
+                Button {
+                    // Add signature
+                } label: {
+                    Label("Add Signature Field", systemImage: "signature")
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundColor(.primary)
+                    .frame(width: 50, height: 50)
+                    .background(Color(UIColor.systemBackground))
+                    .cornerRadius(12)
+            }
+            
             Spacer()
             
-            // Page navigation
+            // Page navigation - centered
             HStack(spacing: 12) {
                 Button {
                     if currentPDFPage > 0 {
@@ -232,18 +277,30 @@ struct DocumentChatView: View {
             
             Spacer()
             
-            // Options menu
+            // Undo button (was eye icon)
+            Button {
+                // TODO: Implement undo
+            } label: {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 20))
+                    .foregroundColor(.primary)
+                    .frame(width: 50, height: 50)
+                    .background(Color(UIColor.systemBackground))
+                    .cornerRadius(12)
+            }
+            
+            // Options menu (three dots)
             Menu {
                 Button {
-                    // Download PDF
+                    downloadPDF()
                 } label: {
                     Label("Download", systemImage: "arrow.down.circle")
                 }
                 
                 Button {
-                    chatViewModel.clearMessages()
+                    // Show file info
                 } label: {
-                    Label("Clear Chat", systemImage: "trash")
+                    Label("File Info", systemImage: "info.circle")
                 }
             } label: {
                 Image(systemName: "ellipsis")
@@ -479,6 +536,10 @@ struct DocumentChatView: View {
             currentPDFDocument = PDFDocument(url: url)
             print("📄 Loaded PDF: \(url.lastPathComponent)")
             print("📝 Fields detected: \(commonFormsFields.count)")
+            print("🎯 Using AnnotatedPDFView: \(!commonFormsFields.isEmpty && FeatureFlags.showBoundingBoxes)")
+            print("🔧 Feature flag showBoundingBoxes: \(FeatureFlags.showBoundingBoxes)")
+        } else {
+            print("❌ No PDF URL available")
         }
     }
 }
