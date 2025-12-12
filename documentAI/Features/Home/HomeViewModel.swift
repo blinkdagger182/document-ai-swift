@@ -7,6 +7,8 @@
 
 import Foundation
 import SwiftUI
+import PhotosUI
+import UniformTypeIdentifiers
 
 @MainActor
 class HomeViewModel: ObservableObject {
@@ -24,26 +26,117 @@ class HomeViewModel: ObservableObject {
     @Published var commonFormsPdfURL: URL?
     @Published var commonFormsFields: [DetectedField] = []
     
+    // Photo picker
+    @Published var selectedPhotoItem: PhotosPickerItem?
+    
     // MARK: - Services
-    private let documentPickerService = DocumentPickerService()
-    private let imagePickerService = ImagePickerService()
     private let apiService = APIService()
     
-    // MARK: - Pick Document
-    func pickDocument() async {
-        if let document = await documentPickerService.pickDocument() {
-            selectedFile = document
+    // MARK: - Handle Document Selection (from fileImporter)
+    func handleDocumentSelection(result: Result<[URL], Error>) async {
+        do {
+            let urls = try result.get()
+            guard let url = urls.first else { return }
+            
+            // Access security-scoped resource
+            guard url.startAccessingSecurityScopedResource() else {
+                print("❌ Failed to access security-scoped resource")
+                return
+            }
+            
+            defer { url.stopAccessingSecurityScopedResource() }
+            
+            // Copy to temporary directory
+            let tempURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension(url.pathExtension)
+            
+            try FileManager.default.copyItem(at: url, to: tempURL)
+            
+            let attributes = try FileManager.default.attributesOfItem(atPath: tempURL.path)
+            let fileSize = attributes[.size] as? Int64
+            
+            let mimeType: String
+            if url.pathExtension.lowercased() == "pdf" {
+                mimeType = "application/pdf"
+            } else {
+                mimeType = "image/\(url.pathExtension.lowercased())"
+            }
+            
+            selectedFile = DocumentModel(
+                id: UUID().uuidString,
+                name: url.lastPathComponent,
+                url: tempURL,
+                mimeType: mimeType,
+                sizeInBytes: fileSize
+            )
+            
             showResults = false
             documentId = ""
+            
+            print("✅ Document selected: \(url.lastPathComponent)")
+            
+        } catch {
+            print("❌ Error handling document: \(error)")
+            alertState = AlertState(
+                title: "Error",
+                message: "Failed to load document: \(error.localizedDescription)"
+            )
         }
     }
     
-    // MARK: - Pick Image
-    func pickImage() async {
-        if let document = await imagePickerService.pickImage() {
-            selectedFile = document
+    // MARK: - Handle Image Selection (from PhotosPicker)
+    func handleImageSelection() async {
+        guard let item = selectedPhotoItem else { return }
+        
+        do {
+            // Load the image data
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                print("❌ Failed to load image data")
+                return
+            }
+            
+            // Determine file extension from content type
+            let contentType = item.supportedContentTypes.first
+            let fileExtension: String
+            if contentType == .png {
+                fileExtension = "png"
+            } else if contentType == .jpeg {
+                fileExtension = "jpg"
+            } else if contentType == .heic {
+                fileExtension = "heic"
+            } else {
+                fileExtension = "jpg" // default
+            }
+            
+            // Save to temporary directory
+            let tempURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension(fileExtension)
+            
+            try data.write(to: tempURL)
+            
+            let fileSize = Int64(data.count)
+            
+            selectedFile = DocumentModel(
+                id: UUID().uuidString,
+                name: "image.\(fileExtension)",
+                url: tempURL,
+                mimeType: "image/\(fileExtension)",
+                sizeInBytes: fileSize
+            )
+            
             showResults = false
             documentId = ""
+            
+            print("✅ Image selected: \(tempURL.lastPathComponent)")
+            
+        } catch {
+            print("❌ Error handling image: \(error)")
+            alertState = AlertState(
+                title: "Error",
+                message: "Failed to load image: \(error.localizedDescription)"
+            )
         }
     }
     

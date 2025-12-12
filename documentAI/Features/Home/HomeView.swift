@@ -6,10 +6,13 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
     @State private var chatMessage = ""
+    @State private var showDocumentPicker = false
+    @State private var showImagePicker = false
     
     var body: some View {
         ZStack {
@@ -37,6 +40,25 @@ struct HomeView: View {
                 message: Text(alertState.message),
                 dismissButton: .default(Text("OK"))
             )
+        }
+        .fileImporter(
+            isPresented: $showDocumentPicker,
+            allowedContentTypes: [.pdf, .image],
+            allowsMultipleSelection: false
+        ) { result in
+            Task {
+                await viewModel.handleDocumentSelection(result: result)
+            }
+        }
+        .photosPicker(
+            isPresented: $showImagePicker,
+            selection: $viewModel.selectedPhotoItem,
+            matching: .images
+        )
+        .onChange(of: viewModel.selectedPhotoItem) { newItem in
+            Task {
+                await viewModel.handleImageSelection()
+            }
         }
     }
     
@@ -92,15 +114,11 @@ struct HomeView: View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
                 actionButton(icon: "plus", text: "Scan PDF") {
-                    Task {
-                        await viewModel.pickImage()
-                    }
+                    showImagePicker = true
                 }
                 
                 actionButton(icon: "folder", text: "Upload from Files") {
-                    Task {
-                        await viewModel.pickDocument()
-                    }
+                    showDocumentPicker = true
                 }
             }
             

@@ -314,6 +314,32 @@ struct DocumentChatView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
     }
+
+    func downloadPDF() {
+        guard let pdfDocument = currentPDFDocument else { return }
+        
+        // Save to Files app
+        let fileName = "D'Vine_Residences_Form.pdf"
+        
+        if let data = pdfDocument.dataRepresentation() {
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+            
+            do {
+                try data.write(to: tempURL)
+                
+                // Present share sheet
+                let activityVC = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+                
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let rootVC = windowScene.windows.first?.rootViewController {
+                    activityVC.popoverPresentationController?.sourceView = rootVC.view
+                    rootVC.present(activityVC, animated: true)
+                }
+            } catch {
+                print("Error saving PDF: \(error)")
+            }
+        }
+    }
     
     // MARK: - Chat Drawer View (Bottom - Instagram Style)
     

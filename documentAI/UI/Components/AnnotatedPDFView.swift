@@ -173,35 +173,40 @@ struct AnnotatedPDFView: UIViewRepresentable {
             
             print("  📍 Converted bounds (points): \(bounds)")
             
-            // Try using .square annotation first for visibility testing
+            // Create widget annotation for interactive text field
             let annotation = PDFAnnotation(
                 bounds: bounds,
-                forType: .square,
+                forType: .widget,
                 withProperties: nil
             )
             
-            // Make it VERY visible for debugging
-            annotation.color = UIColor.red.withAlphaComponent(0.8)
-            annotation.interiorColor = UIColor.yellow.withAlphaComponent(0.3)
+            // iOS Preview PDF style: light blue fill with subtle border
+            annotation.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.15)
+            annotation.color = UIColor.systemBlue.withAlphaComponent(0.3)
             
             let border = PDFBorder()
-            border.lineWidth = 4.0
+            border.lineWidth = 1.0
             border.style = .solid
             annotation.border = border
             
+            // Set widget properties for text input
+            annotation.widgetFieldType = .text
+            annotation.font = UIFont.systemFont(ofSize: 12)
+            annotation.fontColor = UIColor.black
+            
             // Add label if available
             if let label = field.label {
+                annotation.fieldName = label
                 annotation.contents = label
             }
             
-            // Make annotation visible
+            // Make annotation visible and interactive
             annotation.shouldDisplay = true
             annotation.shouldPrint = true
             
-            print("  ✨ Created SQUARE annotation for field \(field.id)")
+            print("  ✨ Created WIDGET annotation for field \(field.id)")
             print("     Type: \(annotation.type ?? "unknown")")
             print("     Bounds: \(annotation.bounds)")
-            print("     Color: \(String(describing: annotation.color))")
             
             return annotation
         }
@@ -284,23 +289,28 @@ struct AnnotatedPDFView: UIViewRepresentable {
         }
         
         func applyFocusStyle(_ annotation: PDFAnnotation) {
-            annotation.color = UIColor.systemGreen
-            annotation.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.1)
+            // When focused: invisible bounds with white background (like iOS Preview)
+            annotation.backgroundColor = UIColor.white
+            annotation.color = UIColor.clear
             
             let border = PDFBorder()
-            border.lineWidth = 3.0
+            border.lineWidth = 0.5
             border.style = .solid
             annotation.border = border
+            
+            // Enable text editing
+            annotation.isReadOnly = false
             
             refreshAnnotation(annotation)
         }
         
         func removeFocusStyle(_ annotation: PDFAnnotation) {
-            annotation.color = UIColor.systemBlue
-            annotation.backgroundColor = UIColor.white.withAlphaComponent(0.8)
+            // When unfocused: light blue fill (like iOS Preview)
+            annotation.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.15)
+            annotation.color = UIColor.systemBlue.withAlphaComponent(0.3)
             
             let border = PDFBorder()
-            border.lineWidth = 2.0
+            border.lineWidth = 1.0
             border.style = .solid
             annotation.border = border
             
